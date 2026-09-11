@@ -1,0 +1,10 @@
+/target/
+/dist/
+/build/
+/.local/
+/node_modules/
+/test-results/
+*.log
+.DS_Store
+.kotlin/
+.kotlin-cli/

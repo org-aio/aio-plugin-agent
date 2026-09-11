@@ -1,0 +1,8 @@
+{
+  "source": "aio-platform/sdk/web",
+  "protocol": "aio:plugin@2",
+  "files": {
+    "guest.js": "19eec962de35b96939e7ab0930bfb3cda67d988d966a77b0102c234efafa8a9d",
+    "host.mjs": "404c9083fa7aa2eafb2e5e1c3e59c6b811d3415c6274e9e8cdd19b56536d6462"
+  }
+}

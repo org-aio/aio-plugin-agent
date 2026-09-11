@@ -1,0 +1,22 @@
+use super::model::*;
+use async_trait::async_trait;
+use uuid::Uuid;
+
+#[async_trait]
+pub trait AgentService: Send + Sync {
+    async fn settings(&self, scope: &Scope) -> ServiceResult<Settings>;
+    async fn save_provider(
+        &self,
+        scope: &Scope,
+        id: Option<Uuid>,
+        draft: ProviderDraft,
+    ) -> ServiceResult<Provider>;
+    async fn delete_provider(&self, scope: &Scope, id: Uuid) -> ServiceResult<()>;
+    async fn conversations(&self, scope: &Scope) -> ServiceResult<Vec<Conversation>>;
+    async fn create(&self, scope: &Scope, draft: ConversationDraft) -> ServiceResult<Conversation>;
+    async fn thread(&self, scope: &Scope, id: Uuid) -> ServiceResult<Thread>;
+    async fn delete(&self, scope: &Scope, id: Uuid) -> ServiceResult<()>;
+    async fn send(&self, scope: &Scope, id: Uuid, prompt: Prompt) -> ServiceResult<Thread>;
+    async fn cancel(&self, scope: &Scope, id: Uuid) -> ServiceResult<Thread>;
+    async fn shutdown(&self);
+}

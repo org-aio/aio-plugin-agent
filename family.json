@@ -1,0 +1,10 @@
+{
+  "repository": "aio-plugin-agent",
+  "children": [
+    {
+      "repository": "aio-plugin-agent-memory",
+      "feature": "memory",
+      "git": "https://github.com/zjarlin/aio-plugin-agent-memory.git"
+    }
+  ]
+}

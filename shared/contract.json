@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Contract",
+  "type": "object",
+  "properties": {
+    "conversation": {
+      "$ref": "#/$defs/Conversation"
+    },
+    "conversation_draft": {
+      "$ref": "#/$defs/ConversationDraft"
+    },
+    "failure": {
+      "$ref": "#/$defs/Failure"
+    },
+    "message": {
+      "$ref": "#/$defs/Message"
+    },
+    "prompt": {
+      "$ref": "#/$defs/Prompt"
+    },
+    "provider": {
+      "$ref": "#/$defs/Provider"
+    },
+    "provider_draft": {
+      "$ref": "#/$defs/ProviderDraft"
+    },
+    "settings": {
+      "$ref": "#/$defs/Settings"
+    },
+    "thread": {
+      "$ref": "#/$defs/Thread"
+    }
+  },
+  "required": [
+    "provider",
+    "provider_draft",
+    "conversation",
+    "conversation_draft",
+    "message",
+    "thread",
+    "prompt",
+    "settings",
+    "failure"
+  ],
+  "$defs": {
+    "Conversation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "providerId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "providerId",
+        "updatedAt"
+      ]
+    },
+    "ConversationDraft": {
+      "type": "object",
+      "properties": {
+        "providerId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "providerId",
+        "title"
+      ]
+    },
+    "Failure": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "error"
+      ]
+    },
+    "Message": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "role": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "content",
+        "status"
+      ]
+    },
+    "Prompt": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "requestId",
+        "content"
+      ]
+    },
+    "Provider": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "hasSecret": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "endpoint",
+        "model",
+        "hasSecret"
+      ]
+    },
+    "ProviderDraft": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "secret": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "endpoint",
+        "model"
+      ]
+    },
+    "Settings": {
+      "type": "object",
+      "properties": {
+        "allowedEndpoints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxPromptChars": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Provider"
+          }
+        }
+      },
+      "required": [
+        "allowedEndpoints",
+        "providers",
+        "maxPromptChars"
+      ]
+    },
+    "Thread": {
+      "type": "object",
+      "properties": {
+        "conversation": {
+          "$ref": "#/$defs/Conversation"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          }
+        }
+      },
+      "required": [
+        "conversation",
+        "messages"
+      ]
+    }
+  }
+}

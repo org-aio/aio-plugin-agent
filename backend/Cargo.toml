@@ -1,0 +1,30 @@
+[package]
+name = "az-agent-server"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+az-agent-model = { path = "../shared/rust" }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+axum = "0.8.6"
+dill = "0.15.0"
+async-trait = "0.1.89"
+tokio = { version = "1.47.1", features = ["full"] }
+tokio-util = "0.7"
+sqlx = { version = "0.8.6", default-features = false, features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "migrate", "macros"] }
+reqwest = { version = "0.12.23", default-features = false, features = ["json", "stream", "rustls-tls"] }
+eventsource-stream = "0.2.3"
+futures-util = "0.3"
+aes-gcm = "0.10.3"
+base64 = "0.22"
+sha2 = "0.10"
+subtle = "2.6"
+url = "2.5"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
