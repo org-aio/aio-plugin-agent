@@ -1,6 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+mod graph;
+pub use graph::*;
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +45,9 @@ pub struct Message {
     pub source_id: Option<String>,
     pub memory_status: Option<String>,
     pub citations: Vec<MemoryCitation>,
+    pub route: Option<String>,
+    pub matched_node_ids: Vec<String>,
+    pub activated_node_ids: Vec<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]

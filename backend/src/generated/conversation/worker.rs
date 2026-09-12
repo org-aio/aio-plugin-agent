@@ -63,9 +63,7 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
     };
     let mut space: Option<String> = row.get("space_id");
     let mut safe: String = row.get("content");
-    let mut status: String = row
-        .get::<Option<String>, _>("memory_status")
-        .unwrap_or_default();
+    let mut source: Option<String> = row.get("source_id");
     if row.get::<String, _>("state") == "pending" {
         let raw = util::decrypt(
             &core.config.encryption_key,
@@ -78,12 +76,12 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
         let captured = memory::invoke(core,&scope,"POST","/capture",json!({"requestId":request,"text":raw,"spaceId":space,"origin":"chat","reference":conversation,"clarifies":clarifies}),false).await;
         let captured: memory::CapturedSource = serde_json::from_value(captured?)?;
         safe = captured.text;
-        status = captured.status;
+        source = Some(captured.id.clone());
         space = Some(captured.space_id.clone());
         let mut tx = core.pool.begin().await?;
         sqlx::query("UPDATE agent_conversations SET space_id=$2 WHERE id=$1 AND (space_id IS NULL OR space_id=$2)").bind(conversation).bind(&captured.space_id).execute(&mut *tx).await?;
         sqlx::query("UPDATE agent_messages SET source_id=$3,memory_status=$4,content=CASE WHEN role='user' THEN $5 ELSE content END,status=CASE WHEN role='user' THEN 'complete' ELSE status END WHERE conversation_id=$1 AND request_id=$2")
-                .bind(conversation).bind(request).bind(&captured.id).bind(&status).bind(&safe).execute(&mut *tx).await?;
+                .bind(conversation).bind(request).bind(&captured.id).bind(&captured.status).bind(&safe).execute(&mut *tx).await?;
         sqlx::query("UPDATE agent_intake SET state='captured',ciphertext=NULL WHERE message_id=$1")
             .bind(message)
             .execute(&mut *tx)
@@ -105,7 +103,22 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
                         .bind(updated["status"].as_str().unwrap_or("quarantined")).bind(conversation).execute(&core.pool).await?;
         }
     }
-    let connection = if status == "quarantined" {
+    if core.jobs.lock().await.contains_key(&conversation) {
+        return Ok(());
+    }
+    let route = memory::route(
+        core,
+        &scope,
+        space.as_deref().context("记忆空间尚未绑定")?,
+        source.as_deref().context("来源尚未保存")?,
+    )
+    .await?;
+    sqlx::query("UPDATE agent_messages SET route=$3,matched_node_ids=$4,activated_node_ids=$5 WHERE conversation_id=$1 AND request_id=$2")
+        .bind(conversation).bind(request).bind(&route.route)
+        .bind(serde_json::to_value(&route.matched_node_ids)?)
+        .bind(serde_json::to_value(&route.activated_node_ids)?)
+        .execute(&core.pool).await?;
+    let connection = if route.route != "model" {
         None
     } else {
         model_access::conversation(
@@ -117,16 +130,6 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
         .await?
     };
     if let Some(connection) = connection {
-        if core.jobs.lock().await.contains_key(&conversation) {
-            return Ok(());
-        }
-        let context = memory::context(
-            core,
-            &scope,
-            space.as_deref().context("记忆空间尚未绑定")?,
-            &safe,
-        )
-        .await?;
         if let Err(error) = generation::respond(
             core.clone(),
             &scope,
@@ -135,7 +138,7 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
                 request_id: request,
                 content: safe,
             },
-            context,
+            (route.context, route.citations),
             connection,
         )
         .await
@@ -148,8 +151,10 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
             }
         }
     } else {
-        sqlx::query("UPDATE agent_messages SET status='complete',content=$3 WHERE conversation_id=$1 AND request_id=$2 AND role='assistant'")
-                .bind(conversation).bind(request).bind(if status=="quarantined" {"已收下，资料已保密暂存。可以在这里补充这段资料的字段用途。"} else {"已收下，资料已保存。模型配置完成后继续整理。"}).execute(&core.pool).await?;
+        sqlx::query("UPDATE agent_messages SET status='complete',content=$3,citations=$4,tokens=0 WHERE conversation_id=$1 AND request_id=$2 AND role='assistant'")
+                .bind(conversation).bind(request)
+                .bind(route.reply.as_deref().unwrap_or("已收下，资料已保存。模型配置完成后继续整理。"))
+                .bind(serde_json::to_value(&route.citations)?).execute(&core.pool).await?;
     }
     sqlx::query("UPDATE agent_intake SET state='complete' WHERE message_id=$1")
         .bind(message)

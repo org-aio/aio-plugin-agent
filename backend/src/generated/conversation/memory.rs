@@ -22,6 +22,8 @@ pub async fn safe_thread(
                 .source_id
                 .iter()
                 .chain(message.citations.iter().map(|citation| &citation.id))
+                .chain(message.activated_node_ids.iter())
+                .chain(message.matched_node_ids.iter())
         })
         .cloned()
         .collect();
@@ -59,9 +61,13 @@ pub async fn safe_thread(
         {
             message.content = "[来源已删除或当前不可访问]".into();
             message.citations.clear();
+            message.activated_node_ids.clear();
+            message.matched_node_ids.clear();
             message.memory_status = Some("unavailable".into());
             message.error = None;
         }
+        message.activated_node_ids.retain(|id| visible.contains(id));
+        message.matched_node_ids.retain(|id| visible.contains(id));
     }
     Ok(thread)
 }
@@ -107,58 +113,26 @@ pub async fn invoke(
     Ok(envelope["body"].clone())
 }
 
-pub async fn context(
-    core: &Core,
-    scope: &Scope,
-    space: &str,
-    query: &str,
-) -> Result<(String, Vec<super::model::MemoryCitation>)> {
-    let graph = invoke(
-        core,
-        scope,
-        "POST",
-        &format!("/recall?spaceId={space}"),
-        json!({"query":query,"limit":8}),
-        false,
-    )
-    .await?;
-    let nodes: Vec<_> = graph["nodes"].as_array().cloned().unwrap_or_default();
-    let ids: Vec<_> = nodes
-        .iter()
-        .take(8)
-        .filter_map(|node| node["id"].as_str())
-        .collect();
-    if ids.is_empty() {
-        return Ok((String::new(), Vec::new()));
-    }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatRoute {
+    pub route: String,
+    pub reply: Option<String>,
+    pub context: String,
+    pub citations: Vec<super::model::MemoryCitation>,
+    pub matched_node_ids: Vec<String>,
+    pub activated_node_ids: Vec<String>,
+}
+
+pub async fn route(core: &Core, scope: &Scope, space: &str, source: &str) -> Result<ChatRoute> {
     let result = invoke(
         core,
         scope,
         "POST",
-        &format!("/context?spaceId={space}"),
-        json!({"nodeIds":ids,"depth":1,"maxCharacters":12000}),
+        &format!("/route?spaceId={space}"),
+        json!({"sourceId":source}),
         false,
     )
     .await?;
-    let citations = result["nodeIds"]
-        .as_array()
-        .context("上下文来源无效")?
-        .iter()
-        .filter_map(|value| {
-            let id = value.as_str()?;
-            Some(super::model::MemoryCitation {
-                id: id.into(),
-                title: nodes
-                    .iter()
-                    .find(|node| node["id"] == id)
-                    .and_then(|node| node["title"].as_str())
-                    .unwrap_or("关联资料")
-                    .into(),
-            })
-        })
-        .collect();
-    Ok((
-        result["markdown"].as_str().unwrap_or("").to_owned(),
-        citations,
-    ))
+    serde_json::from_value(result).context("记忆分流响应无效")
 }

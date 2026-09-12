@@ -203,12 +203,24 @@ export async function verifyBrowser({
             .evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         );
         assert.deepEqual(errors, []);
+        // Compose beta 关闭原生 Dialog 后会保留旧语义树；独立图谱流程从恢复的会话开始。
+        await page.reload();
+        await frame.locator("canvas").first().waitFor({ timeout: 60000 });
+        const { verifyChatGraph } = await import("./chat-graph-browser.mjs");
+        const graphReport = await verifyChatGraph({
+          page,
+          frame,
+          click,
+          agent,
+          conversation,
+          name,
+        });
         await page.reload();
         await frame.locator("canvas").first().waitFor();
         assert.equal(
           (await agent("GET", `/conversations/${conversation.id}`)).messages
             .length,
-          2,
+          4,
         );
         reports.push({
           name,
@@ -219,6 +231,7 @@ export async function verifyBrowser({
           hide: true,
           reload: true,
           consoleErrors: errors.length,
+          ...graphReport,
         });
       } catch (error) {
         await page.screenshot({

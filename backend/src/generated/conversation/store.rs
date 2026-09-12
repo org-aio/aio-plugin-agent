@@ -62,7 +62,7 @@ pub async fn owned(pool: &PgPool, scope: &Scope, id: Uuid) -> ServiceResult<Conv
 }
 pub async fn thread(pool: &PgPool, scope: &Scope, id: Uuid) -> ServiceResult<Thread> {
     let conversation = owned(pool, scope, id).await?;
-    let rows = sqlx::query("SELECT id, role, content, status, error, tokens,source_id,memory_status,citations FROM agent_messages WHERE conversation_id=$1 ORDER BY sequence LIMIT 400")
+    let rows = sqlx::query("SELECT id, role, content, status, error, tokens,source_id,memory_status,citations,route,matched_node_ids,activated_node_ids FROM agent_messages WHERE conversation_id=$1 ORDER BY sequence LIMIT 400")
         .bind(id).fetch_all(pool).await?;
     Ok(Thread {
         conversation,
@@ -78,6 +78,11 @@ pub async fn thread(pool: &PgPool, scope: &Scope, id: Uuid) -> ServiceResult<Thr
                 source_id: r.get("source_id"),
                 memory_status: r.get("memory_status"),
                 citations: serde_json::from_value(r.get("citations")).unwrap_or_default(),
+                route: r.get("route"),
+                matched_node_ids: serde_json::from_value(r.get("matched_node_ids"))
+                    .unwrap_or_default(),
+                activated_node_ids: serde_json::from_value(r.get("activated_node_ids"))
+                    .unwrap_or_default(),
             })
             .collect(),
     })

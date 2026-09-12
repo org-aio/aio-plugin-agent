@@ -26,6 +26,8 @@ internal class AgentState(private val scope: CoroutineScope) {
     var error by mutableStateOf<String?>(null)
     var dialog by mutableStateOf<AgentDialog?>(null)
     var showHistory by mutableStateOf(false)
+    var showGraph by mutableStateOf(true)
+    var focusedMessageId by mutableStateOf<String?>(null)
     private var generation = 0
     private var poll: Job? = null
     private var pending: Pair<String, Prompt>? = null
@@ -89,6 +91,7 @@ internal class AgentState(private val scope: CoroutineScope) {
         val version = ++generation
         poll?.cancel()
         thread = AgentClient.thread(id)
+        focusedMessageId = null
         draft = ""
         pending = null
         showHistory = false
@@ -112,6 +115,7 @@ internal class AgentState(private val scope: CoroutineScope) {
         dialog = null
         conversations = AgentClient.conversations()
         thread = AgentClient.thread(created.id)
+        focusedMessageId = null
         draft = ""
         pending = null
         poll?.cancel()
@@ -127,6 +131,7 @@ internal class AgentState(private val scope: CoroutineScope) {
             pending?.takeIf { it.first == id && it.second.content == input }?.second
                 ?: Prompt(input, requestId()).also { pending = id to it }
         val receipt = AgentClient.send(id, prompt)
+        focusedMessageId = null
         val ids = receipt.messages.map { it.id }.toSet()
         val previous = thread?.takeIf { it.conversation.id == id }?.messages.orEmpty()
         thread = receipt.copy(messages = previous.filter { it.id !in ids } + receipt.messages)
@@ -183,6 +188,10 @@ internal class AgentState(private val scope: CoroutineScope) {
 
     fun openEntry(id: String) = run {
         val entry = AgentClient.memory("GET", "/nodes/$id") as kotlinx.serialization.json.JsonObject
+        if ((entry["kind"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "SOURCE") {
+            dialog = AgentDialog.Source(AgentClient.source(id))
+            return@run
+        }
         dialog =
             AgentDialog.Entry(
                 id,

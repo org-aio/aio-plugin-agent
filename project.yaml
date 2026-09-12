@@ -1,3 +1,4 @@
 modules:
   - ./frontend
+  - ./graph
   - ./shared/model

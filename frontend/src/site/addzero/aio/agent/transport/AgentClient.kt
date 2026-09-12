@@ -21,6 +21,15 @@ private fun uuid(): JsString = js("crypto.randomUUID()")
 private fun copyText(value: JsString): Promise<JsAny?> = js("window.aioPlugin.copy(value)")
 
 internal object AgentClient {
+    suspend fun activation(spaceId: String, ids: List<String>): MemoryGraph =
+        Json.decodeFromJsonElement(
+            memory(
+                "POST",
+                "/activation?spaceId=$spaceId",
+                buildJsonObject { put("nodeIds", JsonArray(ids.map(::JsonPrimitive))) },
+            )
+        )
+
     suspend fun copy(value: String) {
         copyText(value.toJsString()).await<JsAny?>()
     }

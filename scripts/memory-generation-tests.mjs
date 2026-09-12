@@ -119,7 +119,7 @@ export async function verifyGeneration({
   const question = () =>
     agent("POST", `${pendingPath}/messages`, {
       requestId: randomUUID(),
-      content: "项目会议定在周五，请记下来",
+      content: "项目会议定在周五，请分析安排",
     });
   await question();
   const received = await eventually(
@@ -154,7 +154,7 @@ export async function verifyGeneration({
   await agent(
     "POST",
     `/conversations/${team.id}/messages`,
-    { requestId: randomUUID(), content: "会议安排是什么？" },
+    { requestId: randomUUID(), content: "请分析会议安排" },
     "editor",
   );
   const sharedAnswer = await eventually(

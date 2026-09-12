@@ -12,6 +12,9 @@
     "failure": {
       "$ref": "#/$defs/Failure"
     },
+    "memory_graph": {
+      "$ref": "#/$defs/MemoryGraph"
+    },
     "memory_source": {
       "$ref": "#/$defs/MemorySource"
     },
@@ -48,7 +51,8 @@
     "settings",
     "failure",
     "memory_space",
-    "memory_source"
+    "memory_source",
+    "memory_graph"
   ],
   "$defs": {
     "Conversation": {
@@ -135,6 +139,114 @@
         "title"
       ]
     },
+    "MemoryEdge": {
+      "type": "object",
+      "properties": {
+        "evidence": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "relation": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "target",
+        "relation",
+        "evidence"
+      ]
+    },
+    "MemoryGraph": {
+      "type": "object",
+      "properties": {
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MemoryEdge"
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MemoryNode"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "nodes",
+        "edges",
+        "total",
+        "truncated"
+      ]
+    },
+    "MemoryNode": {
+      "type": "object",
+      "properties": {
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "content": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "url": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "content",
+        "url",
+        "tags",
+        "version",
+        "updatedAt",
+        "aliases"
+      ]
+    },
     "MemorySource": {
       "type": "object",
       "properties": {
@@ -212,6 +324,12 @@
     "Message": {
       "type": "object",
       "properties": {
+        "activatedNodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "citations": {
           "type": "array",
           "items": {
@@ -231,6 +349,12 @@
           "type": "string",
           "format": "uuid"
         },
+        "matchedNodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "memoryStatus": {
           "type": [
             "string",
@@ -239,6 +363,12 @@
         },
         "role": {
           "type": "string"
+        },
+        "route": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "sourceId": {
           "type": [
@@ -262,7 +392,9 @@
         "role",
         "content",
         "status",
-        "citations"
+        "citations",
+        "matchedNodeIds",
+        "activatedNodeIds"
       ]
     },
     "Prompt": {

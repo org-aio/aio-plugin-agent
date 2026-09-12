@@ -3,6 +3,7 @@ set -eu
 node scripts/generate-contract.mjs --check
 node scripts/check-sdk.mjs
 node scripts/check-family.mjs
+node scripts/prepare-graph.mjs
 KOTLIN_CLI_NO_WELCOME_BANNER=1 ./kotlin build -m frontend -p wasmJs -v release
 TARGET=${AIO_RUST_TARGET:-$(rustc -vV | sed -n 's/^host: //p')}
 cargo build --locked --release --target "$TARGET" -p az-agent-server

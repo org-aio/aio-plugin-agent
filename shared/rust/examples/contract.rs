@@ -15,6 +15,7 @@ struct Contract {
     failure: Failure,
     memory_space: MemorySpace,
     memory_source: MemorySource,
+    memory_graph: MemoryGraph,
 }
 fn main() {
     println!(

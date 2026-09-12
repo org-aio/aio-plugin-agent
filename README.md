@@ -23,6 +23,8 @@
 - 模型凭据以 AES-256-GCM 加密，绑定租户、用户和配置 ID；前端只能看到是否已保存密钥。地址改变后不会沿用旧密钥。
 - 服务仅能请求宿主允许的完整 API 基址，不跟随重定向，不读取代理环境变量。最多 4 个并发生成，120 秒总超时，输入和输出有界。
 - 支持基于标题、别名、正文与图谱邻域的记忆检索，不依赖向量服务。尚未实现凭据调用外部服务、自动工具执行和模型自主规划。
+- 聊天默认同时显示知识图谱：桌面并排、窄屏上下排列，可收起、缩放、暂停和切换节点列表。当前轮次命中与邻域高亮，历史轮次可重新选中；激活 ID 持久化且与累积引用分开。
+- Memory 的纯 Kotlin 分类规则优先处理明确保存、查找和凭据定位。查找返回净化摘录和来源，不调用模型，也不生成 wiki 任务；明确保存仅后台整理可能使用模型。分析、复合和不确定请求回退模型，检索上下文上限为 6000 字符。回复中的 0 tokens 仅表示该次前台回复未调用模型。
 
 接口参照 [Chat Completions 官方契约](https://developers.openai.com/api/reference/resources/chat)。自定义兼容服务须支持 `stream` 与 SSE `data: [DONE]`；模型 ID 由用户配置，没有写死一个会发生变化的默认模型。
 
@@ -32,7 +34,7 @@
 
 ```sh
 npm ci --ignore-scripts
-npm run build
+AIO_GRAPH_SOURCE=../../kmp-aio/lib/compose/az-compose npm run build
 cargo build --locked -p az-agent-server
 export AIO_TEST_DATABASE_URL='postgres://developer@127.0.0.1:55432/agent_dev'
 node scripts/setup-dev.mjs
@@ -46,6 +48,8 @@ npm run preview
 其他服务由管理员配置 `allowedEndpoints`；本地兼容服务还需 `allowLoopback: true`。密钥不能写进 Git、前端资源或日志。生产应由宿主秘密管理器注入，而不是复制开发配置。
 
 ## 验证
+
+图谱与 Memory 锁定同一个 az-compose 提交。上游是私有仓库，可通过 `AIO_GRAPH_SOURCE` 指定有读取权限的本地 Git 仓库，省略时构建会按锁定提交拉取。
 
 ```sh
 cargo test --workspace

@@ -149,6 +149,9 @@ async fn receipt(core: &Core, scope: &Scope, id: Uuid, request: Uuid) -> Service
                 source_id: None,
                 memory_status: Some("pending".into()),
                 citations: Vec::new(),
+                route: None,
+                matched_node_ids: Vec::new(),
+                activated_node_ids: Vec::new(),
             }
         })
         .collect();

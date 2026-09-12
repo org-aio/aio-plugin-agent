@@ -1,6 +1,7 @@
 product: wasm-js/app
 dependencies:
   - //shared/model
+  - //graph
   - $compose.foundation
   - org.jetbrains.compose.material3:material3:1.12.0-alpha03
   - org.jetbrains.compose.material:material-icons-core:1.7.3

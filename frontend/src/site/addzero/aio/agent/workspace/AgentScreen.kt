@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import site.addzero.aio.agent.editor.AgentDialogs
+import site.addzero.aio.agent.graph.ConversationGraph
 
 @Composable
 internal fun AgentScreen() {
@@ -26,10 +27,14 @@ internal fun AgentScreen() {
     val state = remember(scope) { AgentState(scope) }
     LaunchedEffect(state) { state.refresh() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val compact = maxWidth < 800.dp
+        val compact = maxWidth < 1100.dp
+        val beside = maxWidth >= 1000.dp
+        val graphHeight = minOf(250.dp, maxHeight * .30f)
         Column(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                Modifier.fillMaxWidth()
+                    .height(64.dp)
+                    .padding(horizontal = if (compact) 12.dp else 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (compact)
@@ -44,10 +49,13 @@ internal fun AgentScreen() {
                 Text("Agent", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.weight(1f))
                 if (state.settings.memoryAvailable)
+                    Tool("切换知识图谱", Icons.Default.Hub) { state.showGraph = !state.showGraph }
+                if (state.settings.memoryAvailable)
                     Tool("记忆空间", Icons.Default.Workspaces, !state.busy) { state.configureSpace() }
-                Tool("刷新", Icons.Default.Refresh, !state.busy) {
-                    state.thread?.conversation?.id?.let(state::select) ?: state.refresh()
-                }
+                if (!compact)
+                    Tool("刷新", Icons.Default.Refresh, !state.busy) {
+                        state.thread?.conversation?.id?.let(state::select) ?: state.refresh()
+                    }
                 Tool("模型设置", Icons.Default.Settings, !state.busy) {
                     state.dialog = AgentDialog.Settings
                 }
@@ -72,10 +80,27 @@ internal fun AgentScreen() {
                     History(state)
                 } else {
                     if (!compact) {
-                        Box(Modifier.width(260.dp).fillMaxHeight()) { History(state) }
+                        Box(Modifier.width(220.dp).fillMaxHeight()) { History(state) }
                         VerticalDivider()
                     }
-                    Chat(state, Modifier.weight(1f).fillMaxHeight())
+                    val graphVisible = state.settings.memoryAvailable && state.showGraph
+                    if (beside) {
+                        Chat(state, Modifier.weight(1.2f).fillMaxHeight())
+                        if (graphVisible) {
+                            VerticalDivider()
+                            ConversationGraph(state, Modifier.weight(1f).fillMaxHeight())
+                        }
+                    } else
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            if (graphVisible) {
+                                ConversationGraph(
+                                    state,
+                                    Modifier.fillMaxWidth().height(graphHeight),
+                                )
+                                HorizontalDivider()
+                            }
+                            Chat(state, Modifier.weight(1f).fillMaxWidth())
+                        }
                 }
             }
         }
@@ -149,11 +174,10 @@ private fun Chat(state: AgentState, modifier: Modifier) {
         return
     }
     val list = rememberLazyListState()
-    LaunchedEffect(
-        thread.conversation.id,
-        thread.messages.size,
-        thread.messages.lastOrNull()?.content?.length,
-    ) {
+    LaunchedEffect(thread.conversation.id, thread.messages.size) {
+        list.scrollToItem((thread.messages.size - 1).coerceAtLeast(0))
+    }
+    LaunchedEffect(thread.messages.lastOrNull()?.content?.length) {
         if (
             !list.isScrollInProgress &&
                 (!list.canScrollForward ||
@@ -223,6 +247,26 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                         )
                         if (message.status == "generating")
                             CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp)
+                        if (message.role == "assistant") {
+                            Text(
+                                when (message.route) {
+                                    "save" -> "已接收"
+                                    "recall" -> "记忆检索"
+                                    "model" -> "模型回答"
+                                    else -> ""
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            if (
+                                state.settings.memoryAvailable &&
+                                    message.memoryStatus != "unavailable"
+                            )
+                                Tool("高亮本轮图谱", Icons.Default.Hub) {
+                                    state.focusedMessageId = message.id
+                                    state.showGraph = true
+                                }
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     SelectionContainer {
@@ -249,6 +293,7 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                             Text(
                                 when (message.memoryStatus) {
                                     "complete" -> "已整理"
+                                    "recorded" -> "对话来源"
                                     "processing" -> "整理中"
                                     "quarantined" -> "保密暂存"
                                     "conflict" -> "待整理"

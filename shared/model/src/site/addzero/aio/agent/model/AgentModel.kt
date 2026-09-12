@@ -31,6 +31,36 @@ data class MemoryCitation(
 )
 
 @Serializable
+data class MemoryEdge(
+    val evidence: String,
+    val id: String,
+    val relation: String,
+    val source: String,
+    val target: String
+)
+
+@Serializable
+data class MemoryGraph(
+    val edges: List<MemoryEdge>,
+    val nodes: List<MemoryNode>,
+    val total: Long,
+    val truncated: Boolean
+)
+
+@Serializable
+data class MemoryNode(
+    val aliases: List<String>,
+    val content: String,
+    val id: String,
+    val kind: String,
+    val tags: List<String>,
+    val title: String,
+    val updatedAt: Long,
+    val url: String,
+    val version: Long
+)
+
+@Serializable
 data class MemorySource(
     val createdBy: String,
     val error: String? = null,
@@ -53,12 +83,15 @@ data class MemorySpace(
 
 @Serializable
 data class Message(
+    val activatedNodeIds: List<String>,
     val citations: List<MemoryCitation>,
     val content: String,
     val error: String? = null,
     val id: String,
+    val matchedNodeIds: List<String>,
     val memoryStatus: String? = null,
     val role: String,
+    val route: String? = null,
     val sourceId: String? = null,
     val status: String,
     val tokens: Long? = null

@@ -118,7 +118,7 @@ const broker = await listen(async (req, res) => {
     assert.equal(input.tenantId, "preview");
     const target = new URL(input.path, "http://memory");
     const spaceId = target.searchParams.get("spaceId");
-    if (target.pathname === "/recall" && blockedRecalls.has(spaceId)) {
+    if (target.pathname === "/route" && blockedRecalls.has(spaceId)) {
       blockedRecalls.set(spaceId, blockedRecalls.get(spaceId) + 1);
       throw new Error("测试中的检索服务不可用");
     }
@@ -258,7 +258,7 @@ async function eventually(read, predicate) {
   throw new Error("Memory workflow did not reach expected status");
 }
 const pool = new pg.Pool({ connectionString: config.databaseUrl });
-try {
+async function verify() {
   await startMemory();
   await startAgent();
   const provider = await agent("POST", "/providers", {
@@ -272,6 +272,19 @@ try {
     path: "/spaces",
     body: { title: `集成测试 ${randomUUID()}`, modelBinding: provider.id },
   });
+  if (process.env.AIO_MEMORY_BROWSER_ONLY === "1") {
+    const { verifyBrowser } = await import("./memory-browser.mjs");
+    await verifyBrowser({
+      directory,
+      backendPort: port,
+      space,
+      provider,
+      agent,
+      canary,
+    });
+    console.log("Memory conversation and graph browser checks passed");
+    return;
+  }
   const conversation = await agent("POST", "/conversations", {
     title: "自动记忆验收",
     providerId: provider.id,
@@ -432,6 +445,15 @@ try {
     [conversation.id],
   );
   assert(!JSON.stringify(persisted.rows).includes(canary));
+  const { verifyRouting } = await import("./memory-routing-tests.mjs");
+  await verifyRouting({
+    agent,
+    memory,
+    eventually,
+    modelRequests,
+    canary,
+    provider,
+  });
   const { verifyGeneration } = await import("./memory-generation-tests.mjs");
   await verifyGeneration({
     agent,
@@ -664,6 +686,8 @@ try {
         retryExhaustion: true,
         cancellation: true,
         upstreamFailure: true,
+        localRouting: true,
+        persistedActivation: true,
         modelCalls: modelRequests.length,
       },
       null,
@@ -673,6 +697,9 @@ try {
   console.log(
     "Memory integration passed: capture, queue, wiki, graph, secret isolation, grants, revocation, restart, source deletion, no-model intake, quarantine, conflict review, rollback",
   );
+}
+try {
+  await verify();
 } catch (error) {
   console.error(
     JSON.stringify({ modelCalls: modelRequests.length, failures }).replaceAll(

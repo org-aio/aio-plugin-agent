@@ -275,6 +275,7 @@ impl AgentService for AgentServiceImpl {
                     | "secrets"
                     | "nodes"
                     | "graph"
+                    | "activation"
                     | "search"
                     | "context"
                     | "capture"
