@@ -5,6 +5,7 @@ package site.addzero.aio.agent.transport
 import kotlin.js.*
 import kotlinx.coroutines.await
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
 import kotlinx.serialization.json.Json
 import site.addzero.aio.agent.model.*
 
@@ -17,7 +18,44 @@ fun requestId(): String = uuid().toString()
 
 private fun uuid(): JsString = js("crypto.randomUUID()")
 
+private fun copyText(value: JsString): Promise<JsAny?> = js("window.aioPlugin.copy(value)")
+
 internal object AgentClient {
+    suspend fun copy(value: String) {
+        copyText(value.toJsString()).await<JsAny?>()
+    }
+
+    suspend fun memory(method: String, path: String, body: JsonElement = JsonNull): JsonElement =
+        read(
+            "POST",
+            "/memory",
+            buildJsonObject {
+                    put("method", method)
+                    put("path", path)
+                    put("body", body)
+                }
+                .toString(),
+        )
+
+    suspend fun spaces(): List<MemorySpace> = Json.decodeFromJsonElement(memory("GET", "/spaces"))
+
+    suspend fun source(id: String): MemorySource =
+        Json.decodeFromJsonElement(memory("GET", "/sources/$id"))
+
+    suspend fun reveal(id: String): String =
+        memory("POST", "/secrets/$id/reveal").jsonObject["value"]!!.jsonPrimitive.content
+
+    suspend fun bindModel(space: MemorySpace, provider: String) {
+        memory(
+            "PUT",
+            "/spaces/${space.id}",
+            buildJsonObject {
+                put("title", space.title)
+                put("modelBinding", provider)
+            },
+        )
+    }
+
     private suspend inline fun <reified T> read(
         method: String,
         path: String,

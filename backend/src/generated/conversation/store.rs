@@ -16,10 +16,12 @@ pub fn conversation(row: PgRow) -> Conversation {
         id: row.get("id"),
         title: row.get("title"),
         provider_id: row.get("provider_id"),
+        space_id: row.get("space_id"),
         updated_at: row.get("updated_at"),
     }
 }
-pub const CONVERSATION_COLUMNS: &str = "id, title, provider_id, updated_at::text AS updated_at";
+pub const CONVERSATION_COLUMNS: &str =
+    "id, title, provider_id, space_id, updated_at::text AS updated_at";
 
 // 调用方持有任务锁且确认没有活跃任务，避免把正常生成误判为中断。
 pub async fn recover(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
@@ -60,7 +62,7 @@ pub async fn owned(pool: &PgPool, scope: &Scope, id: Uuid) -> ServiceResult<Conv
 }
 pub async fn thread(pool: &PgPool, scope: &Scope, id: Uuid) -> ServiceResult<Thread> {
     let conversation = owned(pool, scope, id).await?;
-    let rows = sqlx::query("SELECT id, role, content, status, error, tokens FROM agent_messages WHERE conversation_id=$1 ORDER BY sequence LIMIT 400")
+    let rows = sqlx::query("SELECT id, role, content, status, error, tokens,source_id,memory_status,citations FROM agent_messages WHERE conversation_id=$1 ORDER BY sequence LIMIT 400")
         .bind(id).fetch_all(pool).await?;
     Ok(Thread {
         conversation,
@@ -73,6 +75,9 @@ pub async fn thread(pool: &PgPool, scope: &Scope, id: Uuid) -> ServiceResult<Thr
                 status: r.get("status"),
                 error: r.get("error"),
                 tokens: r.get("tokens"),
+                source_id: r.get("source_id"),
+                memory_status: r.get("memory_status"),
+                citations: serde_json::from_value(r.get("citations")).unwrap_or_default(),
             })
             .collect(),
     })

@@ -81,3 +81,17 @@ pub async fn cancel(
 ) -> ServiceResult<Json<Thread>> {
     Ok(Json(service.cancel(&scope, id).await?))
 }
+
+pub async fn memory_request(
+    State(service): Service,
+    Extension(scope): Identity,
+    Json(request): Json<MemoryRequest>,
+) -> ServiceResult<impl axum::response::IntoResponse> {
+    let result = service
+        .memory_request(&scope, &request.method, &request.path, request.body)
+        .await?;
+    Ok((
+        [(axum::http::header::CACHE_CONTROL, "no-store")],
+        Json(result),
+    ))
+}

@@ -19,4 +19,11 @@ pub trait AgentService: Send + Sync {
     async fn send(&self, scope: &Scope, id: Uuid, prompt: Prompt) -> ServiceResult<Thread>;
     async fn cancel(&self, scope: &Scope, id: Uuid) -> ServiceResult<Thread>;
     async fn shutdown(&self);
+    async fn memory_request(
+        &self,
+        scope: &Scope,
+        method: &str,
+        path: &str,
+        body: serde_json::Value,
+    ) -> ServiceResult<serde_json::Value>;
 }

@@ -49,6 +49,7 @@ async fn authenticate(
 pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
     let application = Router::new()
         .route("/settings", get(controller::settings))
+        .route("/memory", post(controller::memory_request))
         .route("/providers", post(controller::add_provider))
         .route(
             "/providers/{id}",

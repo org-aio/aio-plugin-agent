@@ -13,6 +13,8 @@ struct Contract {
     prompt: Prompt,
     settings: Settings,
     failure: Failure,
+    memory_space: MemorySpace,
+    memory_source: MemorySource,
 }
 fn main() {
     println!(

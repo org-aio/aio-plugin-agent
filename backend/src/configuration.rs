@@ -10,6 +10,13 @@ pub struct RuntimeConfig {
     pub allowed_endpoints: BTreeSet<String>,
     pub generation_timeout: Duration,
     pub allow_loopback: bool,
+    pub memory: Option<MemoryConnection>,
+}
+
+#[derive(Clone)]
+pub struct MemoryConnection {
+    pub endpoint: Url,
+    pub token: String,
 }
 
 impl RuntimeConfig {
@@ -30,6 +37,30 @@ impl RuntimeConfig {
                 .collect(),
             generation_timeout: Duration::from_secs(120),
             allow_loopback: std::env::var("AIO_AGENT_ALLOW_LOOPBACK").as_deref() == Ok("1"),
+            memory: match std::env::var("AIO_AGENT_MEMORY_URL") {
+                Ok(value) => {
+                    let endpoint = Url::parse(&value).context("记忆服务绑定无效")?;
+                    let local = endpoint
+                        .host_str()
+                        .is_some_and(|host| matches!(host, "localhost" | "127.0.0.1" | "[::1]"));
+                    ensure!(
+                        (endpoint.scheme() == "https"
+                            || (local
+                                && std::env::var("AIO_AGENT_ALLOW_LOOPBACK").as_deref()
+                                    == Ok("1")))
+                            && endpoint.username().is_empty()
+                            && endpoint.password().is_none()
+                            && endpoint.query().is_none()
+                            && endpoint.fragment().is_none(),
+                        "记忆服务绑定必须为宿主授权的 HTTPS 地址"
+                    );
+                    let token = std::env::var("AIO_AGENT_MEMORY_TOKEN")
+                        .context("记忆服务调用凭据未配置")?;
+                    ensure!(token.len() >= 32, "记忆服务调用凭据无效");
+                    Some(MemoryConnection { endpoint, token })
+                }
+                Err(_) => None,
+            },
         };
         for endpoint in &config.allowed_endpoints {
             config.endpoint(endpoint)?;

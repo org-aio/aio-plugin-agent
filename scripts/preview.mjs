@@ -18,20 +18,25 @@ const config = JSON.parse(
 );
 const assets = await realpath(resolve(root, "dist/frontend"));
 const sdk = resolve(root, "sdk/web");
-const child = spawn(resolve(root, "target/debug/az-agent-server"), [], {
-  stdio: ["ignore", "inherit", "inherit"],
-  env: {
-    ...process.env,
-    AIO_AGENT_DATABASE_URL: config.databaseUrl,
-    AIO_AGENT_MASTER_KEY: config.masterKey,
-    AIO_AGENT_INGRESS_TOKEN: config.ingressToken,
-    AIO_AGENT_ENDPOINTS: config.allowedEndpoints.join(","),
-    AIO_AGENT_ALLOW_LOOPBACK: config.allowLoopback ? "1" : "0",
-    AIO_PLUGIN_PORT: String(backendPort),
-  },
-});
+const child =
+  process.env.AIO_AGENT_EXTERNAL_BACKEND === "1"
+    ? null
+    : spawn(resolve(root, "target/debug/az-agent-server"), [], {
+        stdio: ["ignore", "inherit", "inherit"],
+        env: {
+          ...process.env,
+          AIO_AGENT_DATABASE_URL: config.databaseUrl,
+          AIO_AGENT_MASTER_KEY: config.masterKey,
+          AIO_AGENT_INGRESS_TOKEN: config.ingressToken,
+          AIO_AGENT_ENDPOINTS: config.allowedEndpoints.join(","),
+          AIO_AGENT_ALLOW_LOOPBACK:
+            process.env.AIO_AGENT_ALLOW_LOOPBACK ||
+            (config.allowLoopback ? "1" : "0"),
+          AIO_PLUGIN_PORT: String(backendPort),
+        },
+      });
 let stopped = false;
-child.on("exit", (code) => {
+child?.on("exit", (code) => {
   stopped = true;
   if (code) console.error(`Backend stopped (${code})`);
 });
@@ -44,7 +49,7 @@ for (let attempt = 0; ; attempt++) {
   } catch {}
   await new Promise((resolve) => setTimeout(resolve, 100));
 }
-const shell = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent · AIO</title><body style="margin:0;overflow:hidden"><iframe id="plugin" title="Agent" src="/assets/index.html" sandbox="allow-scripts" style="display:block;width:100vw;height:100vh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';const dispose=mountBridge(document.getElementById('plugin'),async request=>{const response=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json','x-aio-ticket':'${ticket}'},body:JSON.stringify({...request,body:Array.from(request.body)})});if(!response.ok)throw new Error(await response.text());return response.json()});addEventListener('pagehide',dispose,{once:true});</script></body></html>`;
+const shell = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent · AIO</title><body style="margin:0;overflow:hidden"><iframe id="plugin" title="Agent" src="/assets/index.html" sandbox="allow-scripts" style="display:block;width:100vw;height:100vh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';const dispose=mountBridge(document.getElementById('plugin'),async request=>{const response=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json','x-aio-ticket':'${ticket}'},body:JSON.stringify({...request,body:Array.from(request.body)})});if(!response.ok)throw new Error(await response.text());return response.json()},{clipboard:true});addEventListener('pagehide',dispose,{once:true});</script></body></html>`;
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -81,7 +86,7 @@ const server = createServer(async (req, res) => {
       if (
         !["GET", "POST", "PUT", "DELETE"].includes(input.method) ||
         typeof input.path !== "string" ||
-        !/^\/(settings|providers|conversations)(\/[a-zA-Z0-9/-]+)?$/.test(
+        !/^\/(settings|providers|conversations|memory)(\/[a-zA-Z0-9/-]+)?$/.test(
           input.path,
         ) ||
         !Array.isArray(input.body) ||
@@ -196,9 +201,9 @@ const server = createServer(async (req, res) => {
   }
 });
 server.listen(port, "127.0.0.1", () => console.log(origin));
-server.on("error", () => child.kill("SIGTERM"));
+server.on("error", () => child?.kill("SIGTERM"));
 for (const signal of ["SIGTERM", "SIGINT"])
   process.on(signal, () => {
-    child.kill("SIGTERM");
+    child?.kill("SIGTERM");
     server.close();
   });

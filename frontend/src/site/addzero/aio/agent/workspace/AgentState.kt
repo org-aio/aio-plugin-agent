@@ -8,7 +8,16 @@ import site.addzero.aio.agent.transport.AgentClient
 import site.addzero.aio.agent.transport.requestId
 
 internal class AgentState(private val scope: CoroutineScope) {
-    var settings by mutableStateOf(Settings(emptyList(), 16000, emptyList()))
+    var settings by
+        mutableStateOf(
+            Settings(
+                allowedEndpoints = emptyList(),
+                maxPromptChars = 16000,
+                memoryAvailable = false,
+                providers = emptyList(),
+            )
+        )
+    var spaces by mutableStateOf<List<MemorySpace>>(emptyList())
     var conversations by mutableStateOf<List<Conversation>>(emptyList())
     var thread by mutableStateOf<Thread?>(null)
     var draft by mutableStateOf("")
@@ -22,6 +31,16 @@ internal class AgentState(private val scope: CoroutineScope) {
     private var pending: Pair<String, Prompt>? = null
     val running
         get() = thread?.messages?.any { it.status == "generating" } == true
+
+    val processing
+        get() =
+            thread?.messages?.any {
+                it.status == "queued" ||
+                    (it.memoryStatus in setOf("pending", "processing") &&
+                        spaces.any { space ->
+                            space.id == thread?.conversation?.spaceId && space.modelBinding != null
+                        })
+            } == true
 
     fun run(action: suspend () -> Unit) {
         if (busy) return
@@ -48,7 +67,22 @@ internal class AgentState(private val scope: CoroutineScope) {
 
     fun refresh() = run {
         settings = AgentClient.settings()
+        if (settings.memoryAvailable) spaces = AgentClient.spaces()
         conversations = AgentClient.conversations()
+        if (thread == null) {
+            val conversation =
+                conversations.firstOrNull()
+                    ?: AgentClient.create(
+                        ConversationDraft(
+                            title = "记忆对话",
+                            providerId = settings.providers.firstOrNull()?.id,
+                            spaceId = spaces.firstOrNull { it.personal }?.id,
+                        )
+                    )
+            thread = AgentClient.thread(conversation.id)
+            conversations = AgentClient.conversations()
+            watch(generation)
+        }
     }
 
     fun select(id: String) = run {
@@ -61,8 +95,20 @@ internal class AgentState(private val scope: CoroutineScope) {
         watch(version)
     }
 
-    fun create(provider: String, title: String) = run {
-        val created = AgentClient.create(ConversationDraft(provider, title))
+    fun create(provider: String, title: String, spaceId: String? = null) = run {
+        val space = spaces.firstOrNull { it.id == spaceId }
+        if (space?.role == "OWNER" && space.modelBinding == null && provider.isNotEmpty()) {
+            AgentClient.bindModel(space, provider)
+            spaces = AgentClient.spaces()
+        }
+        val created =
+            AgentClient.create(
+                ConversationDraft(
+                    providerId = provider.ifEmpty { null },
+                    title = title,
+                    spaceId = spaceId,
+                )
+            )
         dialog = null
         conversations = AgentClient.conversations()
         thread = AgentClient.thread(created.id)
@@ -75,12 +121,15 @@ internal class AgentState(private val scope: CoroutineScope) {
 
     fun send() = run {
         val id = thread?.conversation?.id ?: return@run
-        val input = draft.trim()
-        if (input.isEmpty()) return@run
+        val input = draft
+        if (input.isBlank()) return@run
         val prompt =
             pending?.takeIf { it.first == id && it.second.content == input }?.second
                 ?: Prompt(input, requestId()).also { pending = id to it }
-        thread = AgentClient.send(id, prompt)
+        val receipt = AgentClient.send(id, prompt)
+        val ids = receipt.messages.map { it.id }.toSet()
+        val previous = thread?.takeIf { it.conversation.id == id }?.messages.orEmpty()
+        thread = receipt.copy(messages = previous.filter { it.id !in ids } + receipt.messages)
         draft = ""
         pending = null
         watch(generation)
@@ -96,12 +145,12 @@ internal class AgentState(private val scope: CoroutineScope) {
 
     private fun watch(version: Int) {
         poll?.cancel()
-        if (!running) return
+        if (!running && !processing) return
         val id = thread!!.conversation.id
         poll =
             scope.launch {
-                while (version == generation && running) {
-                    delay(350)
+                while (version == generation && (running || processing)) {
+                    delay(if (running) 350 else 2000)
                     try {
                         val next = AgentClient.thread(id)
                         if (version == generation) thread = next
@@ -130,6 +179,28 @@ internal class AgentState(private val scope: CoroutineScope) {
         dialog = AgentDialog.Settings
     }
 
+    fun openSource(id: String) = run { dialog = AgentDialog.Source(AgentClient.source(id)) }
+
+    fun openEntry(id: String) = run {
+        val entry = AgentClient.memory("GET", "/nodes/$id") as kotlinx.serialization.json.JsonObject
+        dialog =
+            AgentDialog.Entry(
+                id,
+                entry["title"]
+                    ?.let { it as? kotlinx.serialization.json.JsonPrimitive }
+                    ?.content
+                    .orEmpty(),
+                entry["content"]
+                    ?.let { it as? kotlinx.serialization.json.JsonPrimitive }
+                    ?.content
+                    .orEmpty(),
+            )
+    }
+
+    fun configureSpace() {
+        dialog = AgentDialog.Spaces
+    }
+
     fun remove(target: AgentDialog.Delete) = run {
         AgentClient.remove(target.path)
         dialog = null
@@ -152,4 +223,10 @@ internal sealed interface AgentDialog {
     data class ProviderEditor(val provider: Provider? = null) : AgentDialog
 
     data class Delete(val title: String, val path: String) : AgentDialog
+
+    data class Source(val source: MemorySource) : AgentDialog
+
+    data class Entry(val id: String, val title: String, val content: String) : AgentDialog
+
+    data object Spaces : AgentDialog
 }

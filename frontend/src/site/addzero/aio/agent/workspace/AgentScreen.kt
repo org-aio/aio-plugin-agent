@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import site.addzero.aio.agent.editor.AgentDialogs
@@ -41,6 +43,8 @@ internal fun AgentScreen() {
                 Spacer(Modifier.width(10.dp))
                 Text("Agent", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.weight(1f))
+                if (state.settings.memoryAvailable)
+                    Tool("记忆空间", Icons.Default.Workspaces, !state.busy) { state.configureSpace() }
                 Tool("刷新", Icons.Default.Refresh, !state.busy) {
                     state.thread?.conversation?.id?.let(state::select) ?: state.refresh()
                 }
@@ -85,7 +89,7 @@ private fun History(state: AgentState) {
         OutlinedTextField(
             state.search,
             { state.search = it },
-            Modifier.fillMaxWidth().padding(12.dp),
+            Modifier.fillMaxWidth().padding(12.dp).semantics { contentDescription = "搜索会话" },
             singleLine = true,
             placeholder = { Text("搜索会话") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
@@ -136,13 +140,9 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Text("新对话", style = MaterialTheme.typography.headlineSmall)
-                Button({
-                    state.dialog =
-                        if (state.settings.providers.isEmpty()) AgentDialog.Settings
-                        else AgentDialog.New
-                }) {
+                Button({ state.dialog = AgentDialog.New }) {
                     Icon(Icons.Default.Add, null)
-                    Text(if (state.settings.providers.isEmpty()) "配置模型" else "新建会话")
+                    Text("新建会话")
                 }
             }
         }
@@ -179,6 +179,11 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                         .find { it.id == thread.conversation.providerId }
                         ?.model
                         .orEmpty(),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                Text(
+                    state.spaces.firstOrNull { it.id == thread.conversation.spaceId }?.title
+                        ?: "个人记忆",
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
@@ -235,6 +240,42 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                    message.sourceId?.let { id ->
+                        TextButton(
+                            { state.openSource(id) },
+                            enabled = !state.busy && message.memoryStatus != "unavailable",
+                        ) {
+                            Icon(Icons.Default.Description, null, Modifier.size(16.dp))
+                            Text(
+                                when (message.memoryStatus) {
+                                    "complete" -> "已整理"
+                                    "processing" -> "整理中"
+                                    "quarantined" -> "保密暂存"
+                                    "conflict" -> "待整理"
+                                    "failed" -> "整理失败"
+                                    "unavailable" -> "来源不可访问"
+                                    else -> "已收下"
+                                }
+                            )
+                        }
+                    }
+                    var expanded by remember(message.id) { mutableStateOf(false) }
+                    message.citations.take(if (expanded) message.citations.size else 4).forEach {
+                        citation ->
+                        TextButton({ state.openEntry(citation.id) }, enabled = !state.busy) {
+                            Icon(Icons.Default.Link, null, Modifier.size(16.dp))
+                            Text(citation.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    if (message.citations.size > 4)
+                        TextButton({ expanded = !expanded }) {
+                            Icon(
+                                if (expanded) Icons.Default.ExpandLess
+                                else Icons.Default.ExpandMore,
+                                null,
+                            )
+                            Text(if (expanded) "收起来源" else "全部 ${message.citations.size} 个来源")
+                        }
                     if (message.status == "cancelled")
                         Text("已停止", style = MaterialTheme.typography.labelSmall)
                     message.tokens?.let {
@@ -256,7 +297,7 @@ private fun Chat(state: AgentState, modifier: Modifier) {
             OutlinedTextField(
                 state.draft,
                 { if (it.length <= 16000) state.draft = it },
-                Modifier.weight(1f),
+                Modifier.weight(1f).semantics { contentDescription = "消息输入" },
                 placeholder = { Text("发送消息") },
                 minLines = 2,
                 maxLines = 5,

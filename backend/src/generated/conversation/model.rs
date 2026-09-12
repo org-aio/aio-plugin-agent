@@ -11,6 +11,21 @@ pub struct Scope {
     pub user: String,
 }
 
+pub(super) struct ModelConnection {
+    pub endpoint: String,
+    pub model: String,
+    pub secret: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryRequest {
+    pub method: String,
+    pub path: String,
+    #[serde(default)]
+    pub body: serde_json::Value,
+}
+
 pub struct ServiceError(pub StatusCode, pub String);
 pub type ServiceResult<T> = Result<T, ServiceError>;
 

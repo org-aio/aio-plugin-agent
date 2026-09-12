@@ -12,6 +12,12 @@
     "failure": {
       "$ref": "#/$defs/Failure"
     },
+    "memory_source": {
+      "$ref": "#/$defs/MemorySource"
+    },
+    "memory_space": {
+      "$ref": "#/$defs/MemorySpace"
+    },
     "message": {
       "$ref": "#/$defs/Message"
     },
@@ -40,7 +46,9 @@
     "thread",
     "prompt",
     "settings",
-    "failure"
+    "failure",
+    "memory_space",
+    "memory_source"
   ],
   "$defs": {
     "Conversation": {
@@ -51,8 +59,17 @@
           "format": "uuid"
         },
         "providerId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "uuid"
+        },
+        "spaceId": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "title": {
           "type": "string"
@@ -64,7 +81,6 @@
       "required": [
         "id",
         "title",
-        "providerId",
         "updatedAt"
       ]
     },
@@ -72,8 +88,17 @@
       "type": "object",
       "properties": {
         "providerId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "uuid"
+        },
+        "spaceId": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "title": {
           "type": "string"
@@ -81,7 +106,6 @@
       },
       "additionalProperties": false,
       "required": [
-        "providerId",
         "title"
       ]
     },
@@ -96,9 +120,104 @@
         "error"
       ]
     },
+    "MemoryCitation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ]
+    },
+    "MemorySource": {
+      "type": "object",
+      "properties": {
+        "createdBy": {
+          "type": "string"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SecretReference"
+          }
+        },
+        "spaceId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "id",
+        "spaceId",
+        "text",
+        "status",
+        "secrets",
+        "createdBy",
+        "updatedAt"
+      ]
+    },
+    "MemorySpace": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "modelBinding": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "personal": {
+          "type": "boolean"
+        },
+        "role": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "personal",
+        "role"
+      ]
+    },
     "Message": {
       "type": "object",
       "properties": {
+        "citations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MemoryCitation"
+          }
+        },
         "content": {
           "type": "string"
         },
@@ -112,8 +231,20 @@
           "type": "string",
           "format": "uuid"
         },
+        "memoryStatus": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "role": {
           "type": "string"
+        },
+        "sourceId": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "status": {
           "type": "string"
@@ -130,7 +261,8 @@
         "id",
         "role",
         "content",
-        "status"
+        "status",
+        "citations"
       ]
     },
     "Prompt": {
@@ -204,6 +336,33 @@
         "model"
       ]
     },
+    "SecretReference": {
+      "type": "object",
+      "properties": {
+        "canManage": {
+          "type": "boolean"
+        },
+        "canReveal": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "sourceId",
+        "canReveal",
+        "canManage"
+      ]
+    },
     "Settings": {
       "type": "object",
       "properties": {
@@ -218,6 +377,9 @@
           "format": "uint",
           "minimum": 0
         },
+        "memoryAvailable": {
+          "type": "boolean"
+        },
         "providers": {
           "type": "array",
           "items": {
@@ -228,7 +390,8 @@
       "required": [
         "allowedEndpoints",
         "providers",
-        "maxPromptChars"
+        "maxPromptChars",
+        "memoryAvailable"
       ]
     },
     "Thread": {

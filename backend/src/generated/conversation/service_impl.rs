@@ -11,7 +11,7 @@ use uuid::Uuid;
 pub struct AgentServiceImpl {
     pub(super) core: Arc<Core>,
 }
-pub(super) struct Core {
+pub(crate) struct Core {
     pub pool: PgPool,
     pub config: RuntimeConfig,
     pub client: reqwest::Client,
@@ -19,6 +19,7 @@ pub(super) struct Core {
     pub quota: Arc<Semaphore>,
     pub shutdown: CancellationToken,
     pub _lease: sqlx::pool::PoolConnection<sqlx::Postgres>,
+    pub worker: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl AgentServiceImpl {
@@ -56,17 +57,19 @@ impl AgentServiceImpl {
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(30))
             .build()?;
-        Ok(Self {
-            core: Arc::new(Core {
-                pool,
-                config,
-                client,
-                jobs: Mutex::new(HashMap::new()),
-                quota: Arc::new(Semaphore::new(4)),
-                shutdown: CancellationToken::new(),
-                _lease: lease,
-            }),
-        })
+        let core = Arc::new(Core {
+            pool,
+            config,
+            client,
+            jobs: Mutex::new(HashMap::new()),
+            quota: Arc::new(Semaphore::new(4)),
+            shutdown: CancellationToken::new(),
+            _lease: lease,
+            worker: Mutex::new(None),
+        });
+        super::intake::protect_history(&core).await?;
+        *core.worker.lock().await = Some(super::worker::start(Arc::downgrade(&core)));
+        Ok(Self { core })
     }
 }
 
@@ -79,6 +82,7 @@ impl AgentService for AgentServiceImpl {
             allowed_endpoints: self.core.config.allowed_endpoints.iter().cloned().collect(),
             providers,
             max_prompt_chars: 16000,
+            memory_available: self.core.config.memory.is_some(),
         })
     }
     async fn save_provider(
@@ -187,8 +191,35 @@ impl AgentService for AgentServiceImpl {
     async fn create(&self, scope: &Scope, draft: ConversationDraft) -> ServiceResult<Conversation> {
         let title = util::text(&draft.title, 160, "会话标题")?;
         let id = Uuid::new_v4();
-        let row = sqlx::query(&format!("INSERT INTO agent_conversations(id,tenant_id,user_id,title,provider_id) SELECT $1,$2,$3,$4,id FROM agent_providers WHERE id=$5 AND tenant_id=$2 AND user_id=$3 RETURNING {}",store::CONVERSATION_COLUMNS))
-            .bind(id).bind(&scope.tenant).bind(&scope.user).bind(title).bind(draft.provider_id).fetch_optional(&self.core.pool).await?.ok_or_else(missing)?;
+        if let Some(provider) = draft.provider_id {
+            let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agent_providers WHERE id=$1 AND tenant_id=$2 AND user_id=$3)").bind(provider).bind(&scope.tenant).bind(&scope.user).fetch_one(&self.core.pool).await?;
+            if !exists {
+                return Err(missing());
+            }
+        }
+        if let Some(space) = &draft.space_id {
+            if space.len() != 32 || !space.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err(bad("记忆空间无效"));
+            }
+            let spaces = super::memory::invoke(
+                &self.core,
+                scope,
+                "GET",
+                "/spaces",
+                serde_json::Value::Null,
+                false,
+            )
+            .await?;
+            if !spaces.as_array().is_some_and(|items| {
+                items
+                    .iter()
+                    .any(|item| item["id"] == *space && item["role"] != "READER")
+            }) {
+                return Err(missing());
+            }
+        }
+        let row = sqlx::query(&format!("INSERT INTO agent_conversations(id,tenant_id,user_id,title,provider_id,space_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING {}",store::CONVERSATION_COLUMNS))
+            .bind(id).bind(&scope.tenant).bind(&scope.user).bind(title).bind(draft.provider_id).bind(draft.space_id).fetch_one(&self.core.pool).await?;
         Ok(store::conversation(row))
     }
     async fn thread(&self, scope: &Scope, id: Uuid) -> ServiceResult<Thread> {
@@ -197,7 +228,8 @@ impl AgentService for AgentServiceImpl {
         if !jobs.contains_key(&id) {
             store::recover(&self.core.pool, id).await?;
         }
-        store::thread(&self.core.pool, scope, id).await
+        drop(jobs);
+        super::memory::safe_thread(&self.core, scope, id, false).await
     }
     async fn delete(&self, scope: &Scope, id: Uuid) -> ServiceResult<()> {
         store::owned(&self.core.pool, scope, id).await?;
@@ -214,7 +246,7 @@ impl AgentService for AgentServiceImpl {
         Ok(())
     }
     async fn send(&self, scope: &Scope, id: Uuid, prompt: Prompt) -> ServiceResult<Thread> {
-        super::generation::start(self.core.clone(), scope, id, prompt).await
+        super::intake::receive(self.core.clone(), scope, id, prompt).await
     }
     async fn cancel(&self, scope: &Scope, id: Uuid) -> ServiceResult<Thread> {
         store::owned(&self.core.pool, scope, id).await?;
@@ -223,8 +255,64 @@ impl AgentService for AgentServiceImpl {
         }
         self.thread(scope, id).await
     }
+    async fn memory_request(
+        &self,
+        scope: &Scope,
+        method: &str,
+        path: &str,
+        body: serde_json::Value,
+    ) -> ServiceResult<serde_json::Value> {
+        let root = path
+            .trim_start_matches('/')
+            .split(['/', '?'])
+            .next()
+            .unwrap_or("");
+        if !matches!(method, "GET" | "POST" | "PUT" | "DELETE")
+            || !matches!(
+                root,
+                "spaces"
+                    | "sources"
+                    | "secrets"
+                    | "nodes"
+                    | "graph"
+                    | "search"
+                    | "context"
+                    | "capture"
+                    | "import"
+            )
+            || path.contains("..")
+            || path.len() > 2048
+        {
+            return Err(bad("记忆请求无效"));
+        }
+        let model = if root == "spaces" && matches!(method, "PUT" | "POST") {
+            body.get("modelBinding")
+                .and_then(|value| value.as_str())
+                .filter(|value| !value.is_empty())
+        } else {
+            None
+        };
+        let model = model
+            .map(Uuid::parse_str)
+            .transpose()
+            .map_err(|_| bad("模型绑定无效"))?;
+        if let Some(id) = model {
+            let owned: bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agent_providers WHERE id=$1 AND tenant_id=$2 AND user_id=$3)").bind(id).bind(&scope.tenant).bind(&scope.user).fetch_one(&self.core.pool).await?;
+            if !owned {
+                return Err(missing());
+            }
+        }
+        let result = super::memory::invoke(&self.core, scope, method, path, body, true).await?;
+        if let (Some(provider), Some(space)) = (model, result["id"].as_str()) {
+            sqlx::query("INSERT INTO agent_model_grants(provider_id,space_id) VALUES($1,$2) ON CONFLICT DO NOTHING").bind(provider).bind(space).execute(&self.core.pool).await?;
+        }
+        Ok(result)
+    }
     async fn shutdown(&self) {
         self.core.shutdown.cancel();
+        if let Some(worker) = self.core.worker.lock().await.take() {
+            let _ = worker.await;
+        }
         for _ in 0..100 {
             if self.core.jobs.lock().await.is_empty() {
                 break;

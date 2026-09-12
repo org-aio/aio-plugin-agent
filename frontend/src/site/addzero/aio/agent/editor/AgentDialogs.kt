@@ -24,6 +24,9 @@ internal fun AgentDialogs(state: AgentState) {
             var provider by remember {
                 mutableStateOf(state.settings.providers.firstOrNull()?.id.orEmpty())
             }
+            var spaceId by remember {
+                mutableStateOf(state.spaces.firstOrNull { it.personal }?.id.orEmpty())
+            }
             AlertDialog(
                 dismiss,
                 title = { Text("新建会话") },
@@ -38,17 +41,27 @@ internal fun AgentDialogs(state: AgentState) {
                         )
                         Choice(
                             "模型",
-                            state.settings.providers.map { it.id to it.label },
+                            listOf("" to "暂不使用模型") +
+                                state.settings.providers.map { it.id to it.label },
                             provider,
                             { provider = it },
                         )
+                        if (state.spaces.isNotEmpty())
+                            Choice(
+                                "记忆空间",
+                                state.spaces
+                                    .filter { it.role != "READER" }
+                                    .map { it.id to it.title },
+                                spaceId,
+                                { spaceId = it },
+                            )
                         Feedback(state)
                     }
                 },
                 confirmButton = {
                     TextButton(
-                        { state.create(provider, title.trim()) },
-                        enabled = !state.busy && title.isNotBlank() && provider.isNotEmpty(),
+                        { state.create(provider, title.trim(), spaceId.ifEmpty { null }) },
+                        enabled = !state.busy && title.isNotBlank(),
                     ) {
                         Text("创建")
                     }
@@ -188,6 +201,9 @@ internal fun AgentDialogs(state: AgentState) {
                 dismissButton = { TextButton(dismiss) { Text("取消") } },
             )
         }
+        is AgentDialog.Source -> SourceDialog(state, dialog.source, dismiss)
+        is AgentDialog.Entry -> EntryDialog(state, dialog, dismiss)
+        AgentDialog.Spaces -> SpaceDialog(state, dismiss)
         is AgentDialog.Delete ->
             AlertDialog(
                 dismiss,
@@ -218,7 +234,7 @@ private fun Feedback(state: AgentState) {
 }
 
 @Composable
-private fun Choice(
+internal fun Choice(
     label: String,
     items: List<Pair<String, String>>,
     value: String,
