@@ -46,7 +46,7 @@ internal fun AgentScreen() {
                     }
                 Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(10.dp))
-                Text("Agent", style = MaterialTheme.typography.titleLarge)
+                Text("智能体", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.weight(1f))
                 if (state.settings.memoryAvailable)
                     Tool("切换知识图谱", Icons.Default.Hub) { state.showGraph = !state.showGraph }
@@ -242,7 +242,7 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                                 else MaterialTheme.colorScheme.primary,
                         )
                         Text(
-                            if (message.role == "user") "你" else "Agent",
+                            if (message.role == "user") "你" else "智能体",
                             style = MaterialTheme.typography.labelLarge,
                         )
                         if (message.status == "generating")

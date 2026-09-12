@@ -1,4 +1,4 @@
-# AIO Agent
+# 智能体
 
 `aio-plugin-agent`：Pi Agent 运行时 + Rust 持久化与鉴权服务 + 真实 Compose Web 界面 + PostgreSQL。同仓 `frontend/`、`backend/`、`runtime/`、`shared/`，Rust JsonSchema 生成 Kotlin 传输模型，不带 JVM。Pi 使用官方 `@earendil-works/pi-coding-agent` / `pi-ai` 0.85.1，界面不依赖 Pi 的 TUI。
 
