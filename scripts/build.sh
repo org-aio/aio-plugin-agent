@@ -11,3 +11,4 @@ mkdir -p dist
 rm -rf dist/frontend
 cp -R build/tasks/_frontend_buildWasmJsAppWasmJsRelease dist/frontend
 cp "target/$TARGET/release/az-agent-server" dist/agent-server
+node scripts/package-runtime.mjs

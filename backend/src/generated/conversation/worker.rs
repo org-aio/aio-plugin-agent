@@ -1,4 +1,5 @@
-use super::{generation, memory, model::*, model_access, provider, service_impl::Core, util};
+use super::{generation, memory, model::*, model_access, service_impl::Core, util};
+use crate::runtime;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -293,18 +294,20 @@ async fn compile(core: &Arc<Core>, scope: &Scope, task: &Value) -> Result<Value>
         json!({"role":"user","content":serde_json::to_string(&json!({"source":task["source"],"existing":task["existing"]}))?}),
     ];
     let (sender, mut receiver) = mpsc::channel(32);
-    let upstream = provider::generate(
+    let upstream = runtime::generate(
+        &core.config.engine,
         &core.client,
         &connection.endpoint,
         &connection.model,
         connection.secret.as_deref(),
         messages,
+        None,
         sender,
     );
     let collect = async {
         let mut output = String::new();
         while let Some(delta) = receiver.recv().await {
-            if let provider::Delta::Text(text) = delta {
+            if let runtime::Delta::Text(text) = delta {
                 output.push_str(&text);
                 ensure!(output.len() <= 100_000, "整理结果过大");
             }

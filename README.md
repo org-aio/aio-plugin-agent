@@ -1,6 +1,8 @@
 # AIO Agent
 
-`aio-plugin-agent`：Rust 模型服务 + 真实 Compose Web 界面 + PostgreSQL。同仓 `frontend/`、`backend/`、`shared/`，Rust JsonSchema 生成 Kotlin 传输模型。后端是 Rust 常驻 process，不带 JVM。
+`aio-plugin-agent`：Pi Agent 运行时 + Rust 持久化与鉴权服务 + 真实 Compose Web 界面 + PostgreSQL。同仓 `frontend/`、`backend/`、`runtime/`、`shared/`，Rust JsonSchema 生成 Kotlin 传输模型，不带 JVM。Pi 使用官方 `@earendil-works/pi-coding-agent` / `pi-ai` 0.85.1，界面不依赖 Pi 的 TUI。
+
+运行时边界见 [Agent 运行时](runtime/README.md)。复用 Pi AgentSession、模型适配器、流处理和原生扩展工具循环；AIO 保留空间授权、秘密隔离、任务持久化和知识提交，通过无 UI 依赖的 JSON 进程协议连接。
 
 ## 子插件规范
 
@@ -13,7 +15,7 @@
 ## 当前能力
 
 - 模型配置、会话创建、历史查看、消息生成、停止生成、确认删除。
-- 请求 OpenAI-compatible `/chat/completions`，Rust 读取真实 SSE；正在生成时前端每 350ms 获取持久化快照，结束后停止轮询。现有桥不支持推送流，不宣称浏览器已直连 SSE。
+- 请求 OpenAI-compatible `/chat/completions`，Pi 解析真实 SSE，Rust 仅转发授权出站；正在生成时前端每 350ms 获取持久化快照，结束后停止轮询。现有桥不支持推送流，不宣称浏览器已直连 SSE。
 - 输入、会话搜索、弹窗草稿是 Compose 本地状态。输入不会发送模型请求。
 - 发送先在 PostgreSQL 事务中写入加密收件箱、请求指纹和“已收下”回复，随后由后台隔离秘密、检索资料并生成回复。普通消息表、历史上下文和引用仅使用净化内容。重复请求 UUID 不重复收件，不同内容复用同一 UUID 会被拒绝。
 - Memory 管理空间、来源、秘密和整理租约；Agent 的独立后台任务执行模型请求并提交 wiki 修订。前台问答可抢占后台整理，暂停不消耗失败重试次数。每个空间需要显式绑定整理模型，未配置时继续收件。
@@ -22,15 +24,15 @@
 - 部分输出每 250ms 落库，进程异常退出后标记中断。净化及整理任务由持久状态恢复，保留原文和已提交知识；未完成的模型回复可继续对话。
 - 模型凭据以 AES-256-GCM 加密，绑定租户、用户和配置 ID；前端只能看到是否已保存密钥。地址改变后不会沿用旧密钥。
 - 服务仅能请求宿主允许的完整 API 基址，不跟随重定向，不读取代理环境变量。最多 4 个并发生成，120 秒总超时，输入和输出有界。
-- 支持基于标题、别名、正文与图谱邻域的记忆检索，不依赖向量服务。尚未实现凭据调用外部服务、自动工具执行和模型自主规划。
+- 支持基于标题、别名、正文与图谱邻域的记忆检索，不依赖向量服务。Pi 可通过原生 `memory_search` 工具补充检索，结果重新校验当前空间权限，并写回来源引用和本轮图谱激活；初版不开放 Shell、文件读写或凭据调用外部服务。
 - 聊天默认同时显示知识图谱：桌面并排、窄屏上下排列，可收起、缩放、暂停和切换节点列表。当前轮次命中与邻域高亮，历史轮次可重新选中；激活 ID 持久化且与累积引用分开。
 - Memory 的纯 Kotlin 分类规则优先处理明确保存、查找和凭据定位。查找返回净化摘录和来源，不调用模型，也不生成 wiki 任务；明确保存仅后台整理可能使用模型。分析、复合和不确定请求回退模型，检索上下文上限为 6000 字符。回复中的 0 tokens 仅表示该次前台回复未调用模型。
 
-接口参照 [Chat Completions 官方契约](https://developers.openai.com/api/reference/resources/chat)。自定义兼容服务须支持 `stream` 与 SSE `data: [DONE]`；模型 ID 由用户配置，没有写死一个会发生变化的默认模型。
+接口参照 [Chat Completions 官方契约](https://developers.openai.com/api/reference/resources/chat)。自定义兼容服务须支持分段消息、`stream`、有效的 `finish_reason` 与 SSE `data: [DONE]`；模型 ID 由用户配置，没有写死默认模型。Pi SDK 参照 [官方 SDK 文档](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md)。
 
 ## 本地运行
 
-依赖：Node.js 22+、固定 Rust nightly 2026-05-25（Dill 要求）、Kotlin wrapper 0.12.0-dev-4233、独立开发 PostgreSQL。前端编译器 2.4.10 / Compose 1.12.0-beta03，资源包含本地中文字体，不用公网 CDN。
+依赖：Node.js 22.19+、固定 Rust nightly 2026-05-25（Dill 要求）、Kotlin wrapper 0.12.0-dev-4233、独立开发 PostgreSQL。前端编译器 2.4.10 / Compose 1.12.0-beta03，资源包含本地中文字体，不用公网 CDN。
 
 ```sh
 npm ci --ignore-scripts
@@ -54,6 +56,7 @@ npm run preview
 ```sh
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
+npm run test:runtime
 node scripts/check-family.mjs ../aio-plugin-agent-memory
 node scripts/test-service.mjs
 npm run test:browser

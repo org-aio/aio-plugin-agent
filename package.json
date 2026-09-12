@@ -6,6 +6,7 @@
     "build": "sh scripts/build.sh",
     "preview": "node scripts/preview.mjs",
     "test:browser": "node scripts/test-browser.mjs",
+    "test:runtime": "PI_OFFLINE=1 node --test runtime/test/*.test.mjs",
     "contract": "node scripts/generate-contract.mjs"
   },
   "devDependencies": {
@@ -14,5 +15,9 @@
     "playwright": "1.58.2",
     "pngjs": "7.0.0",
     "prettier": "3.6.2"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1"
   }
 }

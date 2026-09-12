@@ -26,6 +26,12 @@ pub struct MemoryRequest {
     pub body: serde_json::Value,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct MemorySearch {
+    pub query: String,
+}
+
 pub struct ServiceError(pub StatusCode, pub String);
 pub type ServiceResult<T> = Result<T, ServiceError>;
 

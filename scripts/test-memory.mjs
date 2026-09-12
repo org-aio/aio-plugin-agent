@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { spawn, execFileSync } from "node:child_process";
+import {
+  messageText,
+  runtimeModelResponse,
+  verifyRuntime,
+} from "./runtime-tests.mjs";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
@@ -139,7 +144,9 @@ const broker = await listen(async (req, res) => {
 const upstream = await listen(async (req, res) => {
   const input = await jsonBody(req);
   modelRequests.push(input);
-  const compiling = input.messages[0].content.startsWith("将 source.text");
+  const compiling = messageText(input.messages[0]).startsWith("将 source.text");
+  if (!compiling && runtimeModelResponse(input, res, req.headers.authorization))
+    return;
   if (!compiling && input.model === "fail") {
     res.writeHead(503).end(canary);
     return;
@@ -153,7 +160,7 @@ const upstream = await listen(async (req, res) => {
   if (
     !compiling &&
     (input.model === "slow" ||
-      input.messages.at(-1).content.includes("停止生成验收"))
+      messageText(input.messages.at(-1)).includes("停止生成验收"))
   ) {
     res.writeHead(200, { "content-type": "text/event-stream" });
     const timer = setInterval(
@@ -168,7 +175,7 @@ const upstream = await listen(async (req, res) => {
   }
   let content = "已记录。";
   if (compiling) {
-    const { source } = JSON.parse(input.messages.at(-1).content);
+    const { source } = JSON.parse(messageText(input.messages.at(-1)));
     content = JSON.stringify({
       entries: [
         {
@@ -203,7 +210,7 @@ const upstream = await listen(async (req, res) => {
   res
     .writeHead(200, { "content-type": "text/event-stream" })
     .end(
-      `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`,
+      `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
     );
 });
 const port = Number(process.env.AIO_MEMORY_TEST_PORT || 4299),
@@ -455,6 +462,14 @@ async function verify() {
     provider,
   });
   const { verifyGeneration } = await import("./memory-generation-tests.mjs");
+  await verifyRuntime({
+    agent,
+    memory,
+    eventually,
+    space,
+    endpoint: `${upstream}/v1`,
+    modelRequests,
+  });
   await verifyGeneration({
     agent,
     space,

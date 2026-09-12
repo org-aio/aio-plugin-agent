@@ -1,9 +1,5 @@
-use super::{
-    model::*,
-    provider::{self, Delta},
-    service_impl::Core,
-    store, util,
-};
+use super::{model::*, service_impl::Core, store, util};
+use crate::runtime::{self, Delta, ToolHandler};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::{OwnedSemaphorePermit, mpsc};
@@ -32,6 +28,11 @@ pub async fn respond(
     }) {
         return Err(missing());
     }
+    let source = safe
+        .messages
+        .iter()
+        .find(|message| message.id == current)
+        .and_then(|message| message.source_id.clone());
     let history: Vec<_> = safe
         .messages
         .into_iter()
@@ -113,6 +114,15 @@ pub async fn respond(
     tx.commit().await?;
     let cancel = core.shutdown.child_token();
     jobs.insert(id, cancel.clone());
+    let tools = safe.conversation.space_id.map(|space| {
+        Arc::new(super::memory_tools::MemoryTools {
+            core: core.clone(),
+            scope: scope.clone(),
+            space,
+            assistant,
+            source,
+        }) as Arc<dyn ToolHandler>
+    });
     let task_core = core.clone();
     tokio::spawn(async move {
         run(
@@ -123,6 +133,7 @@ pub async fn respond(
             connection.model,
             connection.secret,
             messages,
+            tools,
             cancel,
             permit,
         )
@@ -142,21 +153,25 @@ async fn run(
     model: String,
     secret: Option<String>,
     messages: Vec<serde_json::Value>,
+    tools: Option<Arc<dyn ToolHandler>>,
     cancel: CancellationToken,
     _permit: OwnedSemaphorePermit,
 ) {
     let (sender, mut receiver) = mpsc::channel(32);
     let client = core.client.clone();
     let timeout = core.config.generation_timeout;
+    let engine = core.config.engine.clone();
     let upstream = tokio::spawn(async move {
         tokio::time::timeout(
             timeout,
-            provider::generate(
+            runtime::generate(
+                &engine,
                 &client,
                 &endpoint,
                 &model,
                 secret.as_deref(),
                 messages,
+                tools,
                 sender,
             ),
         )
