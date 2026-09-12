@@ -90,9 +90,25 @@ pub async fn invoke(
     interactive: bool,
 ) -> Result<Value> {
     let connection = core.config.memory.as_ref().context("记忆服务尚未绑定")?;
-    let response = core.client.post(connection.endpoint.clone()).bearer_auth(&connection.token)
-        .json(&json!({"method":method,"path":path,"body":body,"tenantId":scope.tenant,"userId":scope.user,"interactive":interactive}))
-        .timeout(std::time::Duration::from_secs(30)).send().await.context("记忆服务暂不可用")?;
+    let response = core
+        .client
+        .post(connection.endpoint.clone())
+        .bearer_auth(&connection.token)
+        .header("x-aio-token", &connection.token)
+        .json(&az_plugin_contract::process::ServiceRequest {
+            target: crate::hosting::MEMORY_SOURCE.into(),
+            method: method.into(),
+            path: path.into(),
+            body,
+            tenant_id: scope.tenant.clone(),
+            user_id: scope.user.clone(),
+            context_id: scope.context_id.clone(),
+            interactive,
+        })
+        .timeout(std::time::Duration::from_secs(30))
+        .send()
+        .await
+        .context("记忆服务暂不可用")?;
     ensure!(response.status().is_success(), "记忆服务拒绝请求");
     ensure!(
         response.content_length().unwrap_or(0) <= 2 * 1024 * 1024,

@@ -43,6 +43,7 @@ fn decode(core: &Core, scope: &Scope, row: PgRow) -> Result<ModelConnection> {
     let endpoint: String = row.get("endpoint");
     core.config.endpoint(&endpoint)?;
     let owner = Scope {
+        context_id: None,
         tenant: scope.tenant.clone(),
         user: row.get("user_id"),
     };

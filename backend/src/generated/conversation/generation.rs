@@ -161,12 +161,14 @@ async fn run(
     let client = core.client.clone();
     let timeout = core.config.generation_timeout;
     let engine = core.config.engine.clone();
+    let gateway = core.config.gateway.clone();
     let upstream = tokio::spawn(async move {
         tokio::time::timeout(
             timeout,
             runtime::generate(
                 &engine,
                 &client,
+                gateway.as_ref(),
                 &endpoint,
                 &model,
                 secret.as_deref(),

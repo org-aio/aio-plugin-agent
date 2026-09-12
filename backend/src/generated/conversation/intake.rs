@@ -20,6 +20,7 @@ pub async fn protect_history(core: &Core) -> anyhow::Result<()> {
         for row in rows {
             let id: Uuid = row.get("id");
             let scope = Scope {
+                context_id: None,
                 tenant: row.get("tenant_id"),
                 user: row.get("user_id"),
             };

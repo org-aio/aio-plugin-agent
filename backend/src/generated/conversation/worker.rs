@@ -59,6 +59,7 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
     let conversation: Uuid = row.get("conversation_id");
     let request: Uuid = row.get("request_id");
     let scope = Scope {
+        context_id: None,
         tenant: row.get("tenant_id"),
         user: row.get("user_id"),
     };
@@ -168,6 +169,7 @@ async fn synchronize(core: &Core) -> Result<()> {
     let rows=sqlx::query("SELECT * FROM (SELECT DISTINCT c.tenant_id,c.user_id,m.source_id FROM agent_messages m JOIN agent_conversations c ON c.id=m.conversation_id WHERE m.source_id IS NOT NULL AND m.memory_status IN ('pending','processing')) pending ORDER BY random() LIMIT 16").fetch_all(&core.pool).await?;
     for row in rows {
         let scope = Scope {
+            context_id: None,
             tenant: row.get("tenant_id"),
             user: row.get("user_id"),
         };
@@ -202,6 +204,7 @@ async fn compile_one(core: &Arc<Core>) -> Result<()> {
     let spaces = sqlx::query("SELECT * FROM (SELECT tenant_id,user_id,space_id FROM agent_conversations WHERE space_id IS NOT NULL UNION SELECT p.tenant_id,p.user_id,g.space_id FROM agent_model_grants g JOIN agent_providers p ON p.id=g.provider_id) scopes ORDER BY random() LIMIT 200").fetch_all(&core.pool).await?;
     for row in spaces {
         let scope = Scope {
+            context_id: None,
             tenant: row.get("tenant_id"),
             user: row.get("user_id"),
         };
@@ -297,6 +300,7 @@ async fn compile(core: &Arc<Core>, scope: &Scope, task: &Value) -> Result<Value>
     let upstream = runtime::generate(
         &core.config.engine,
         &core.client,
+        core.config.gateway.as_ref(),
         &connection.endpoint,
         &connection.model,
         connection.secret.as_deref(),

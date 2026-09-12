@@ -13,6 +13,7 @@ use subtle::ConstantTimeEq;
 #[derive(Clone)]
 pub struct Ingress {
     pub token: String,
+    pub tenant: Option<String>,
 }
 
 async fn authenticate(
@@ -40,7 +41,18 @@ async fn authenticate(
         let (Some(tenant), Some(user)) = (read("x-aio-tenant-id"), read("x-aio-user-id")) else {
             return StatusCode::UNAUTHORIZED.into_response();
         };
-        Scope { tenant, user }
+        if ingress
+            .tenant
+            .as_ref()
+            .is_some_and(|bound| bound != &tenant)
+        {
+            return StatusCode::UNAUTHORIZED.into_response();
+        }
+        Scope {
+            tenant,
+            user,
+            context_id: read("x-aio-context"),
+        }
     };
     request.extensions_mut().insert(scope);
     next.run(request).await
@@ -70,5 +82,6 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
         .with_state(service);
     Router::new()
         .route("/health", get(|| async { "ok" }))
+        .route("/aio/describe", get(crate::hosting::describe))
         .merge(application)
 }

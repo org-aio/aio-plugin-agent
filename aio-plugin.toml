@@ -1,0 +1,26 @@
+schema_version = 2
+
+[plugin.marketplace]
+title = "智能体"
+summary = "Compose 对话工作台，复用 Pi Agent 运行时，按空间保存与检索记忆并显示知识图谱。"
+license = "MIT"
+tags = ["智能体", "对话", "记忆"]
+
+[plugin.runtime]
+artifact = "dist/agent-server"
+host_version = ">=2026.9.11"
+
+[plugin.runtime.process]
+image = "sha256:8ae75514bb53a1386dd623789f02cdc7648bcc2d37fe6dcef2fb684c15d1eadc"
+endpoints = ["https://api.openai.com/v1"]
+services = ["https://github.com/zjarlin/aio-plugin-agent-memory.git"]
+
+[plugin.frontend]
+path = "dist/frontend"
+
+[plugin.database]
+migrations = "backend/migrations"
+
+[plugin.capabilities]
+database = true
+cryptography = true

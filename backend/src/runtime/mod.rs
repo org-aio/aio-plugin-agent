@@ -19,6 +19,7 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 pub(crate) async fn generate(
     engine: &EngineConfig,
     client: &reqwest::Client,
+    gateway: Option<&crate::configuration::Gateway>,
     endpoint: &str,
     model: &str,
     secret: Option<&str>,
@@ -98,6 +99,7 @@ pub(crate) async fn generate(
                 );
                 pending.spawn(transport::forward(
                     client.clone(),
+                    gateway.cloned(),
                     endpoint.into(),
                     secret.map(str::to_owned),
                     body,

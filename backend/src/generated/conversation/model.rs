@@ -9,6 +9,7 @@ pub use az_agent_model::*;
 pub struct Scope {
     pub tenant: String,
     pub user: String,
+    pub context_id: Option<String>,
 }
 
 pub(super) struct ModelConnection {

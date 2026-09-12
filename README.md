@@ -10,7 +10,7 @@
 - 记忆子插件：[aio-plugin-agent-memory](https://github.com/zjarlin/aio-plugin-agent-memory)。
 - 后续子插件一律 `aio-plugin-agent-<功能名>`，如 `aio-plugin-agent-tools`；不再使用独立顶级 `aio-plugin-<子功能>` 名称。
 - 子插件 Kotlin 包为 `site.addzero.aio.agent.<功能名>`；Rust 包名保留 `az-` 前缀。仓库名表示来源和归属，不是 Dill 运行时类型身份。
-- `family.json` 与检查脚本约束命名和归属。Agent 通过受信宿主桥调用 Memory，不直接访问子插件数据库；联合安装和回滚仍需正式宿主接入。
+- `family.json` 与检查脚本约束命名和归属。Agent 通过受信宿主桥调用 Memory，不直接访问子插件数据库；正式市场根据父子清单校验独立安装、停用和卸载依赖。
 
 ## 当前能力
 
@@ -68,4 +68,4 @@ npm run test:browser
 
 ## 公网状态
 
-尚未部署公网。平台运行库已增加版本化加密、持久数据库绑定和 v2 Component 持久激活，但现役产品尚未接入该发布链，process 监督器仍缺受控数据库、跨插件与模型出站授权。部署门槛见 [部署边界](deployment/README.md)。开发桥不等于正式跨插件 broker，`family.json` 不等于联合生命周期。
+提供 v2 process 清单和正式宿主入口，Compose 通过 AIO 的 v2 沙箱桥调用服务。容器无网络，数据库、Memory 和模型调用经过宿主私有 Unix 通道；Pi 不读取挂载中的密钥。上线前需通过宿主数据库副本、父子安装和浏览器验收，发布状态以宿主交付记录为准。构建与授权见 [部署边界](deployment/README.md)。

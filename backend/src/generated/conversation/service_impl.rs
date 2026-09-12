@@ -51,12 +51,15 @@ impl AgentServiceImpl {
         .await?;
         ensure!(locked, "同一数据空间已有 Agent 实例运行，请先排空旧实例");
         sqlx::query("UPDATE agent_messages SET status='interrupted', error='服务重启，生成已中断' WHERE status='generating'").execute(&pool).await?;
-        let client = reqwest::Client::builder()
+        let mut client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .connect_timeout(Duration::from_secs(10))
-            .read_timeout(Duration::from_secs(30))
-            .build()?;
+            .read_timeout(Duration::from_secs(30));
+        if let Some(gateway) = &config.gateway {
+            client = client.unix_socket(gateway.socket.clone());
+        }
+        let client = client.build()?;
         let core = Arc::new(Core {
             pool,
             config,

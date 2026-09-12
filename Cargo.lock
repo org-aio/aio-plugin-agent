@@ -152,6 +152,7 @@ dependencies = [
  "async-trait",
  "axum",
  "az-agent-model",
+ "az-plugin-contract",
  "base64",
  "dill",
  "futures-util",
@@ -167,6 +168,15 @@ dependencies = [
  "tower",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "az-plugin-contract"
+version = "2026.5.10"
+source = "git+https://github.com/zjarlin/aio-platform.git?rev=f937a5dac18263313da288582c257cb42e1f416d#f937a5dac18263313da288582c257cb42e1f416d"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

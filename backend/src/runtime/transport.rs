@@ -19,18 +19,25 @@ pub(super) async fn send(input: &Input, message: RuntimeCommand<'_>) -> Result<(
 
 pub(super) async fn forward(
     client: reqwest::Client,
+    gateway: Option<crate::configuration::Gateway>,
     endpoint: String,
     secret: Option<String>,
     body: Value,
     id: u32,
     input: Input,
 ) -> Result<()> {
-    let mut request = client
-        .post(format!(
+    let mut request = if let Some(gateway) = gateway {
+        client
+            .post("http://localhost/egress")
+            .header("x-aio-endpoint", &endpoint)
+            .header("x-aio-token", gateway.token)
+    } else {
+        client.post(format!(
             "{}/chat/completions",
             endpoint.trim_end_matches('/')
         ))
-        .json(&body);
+    }
+    .json(&body);
     if let Some(secret) = secret {
         request = request.bearer_auth(secret);
     }

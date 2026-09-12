@@ -1,5 +1,6 @@
 pub mod configuration;
 pub mod generated;
+pub mod hosting;
 pub mod runtime;
 pub mod transport;
 

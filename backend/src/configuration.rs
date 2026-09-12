@@ -6,12 +6,19 @@ use url::Url;
 #[derive(Clone)]
 pub struct RuntimeConfig {
     pub engine: crate::runtime::EngineConfig,
+    pub gateway: Option<Gateway>,
     pub database_url: String,
     pub encryption_key: [u8; 32],
     pub allowed_endpoints: BTreeSet<String>,
     pub generation_timeout: Duration,
     pub allow_loopback: bool,
     pub memory: Option<MemoryConnection>,
+}
+
+#[derive(Clone)]
+pub struct Gateway {
+    pub socket: std::path::PathBuf,
+    pub token: String,
 }
 
 #[derive(Clone)]
@@ -25,6 +32,7 @@ impl RuntimeConfig {
         let key = STANDARD
             .decode(std::env::var("AIO_AGENT_MASTER_KEY").context("缺少 AIO_AGENT_MASTER_KEY")?)?;
         let config = Self {
+            gateway: None,
             engine: crate::runtime::EngineConfig::from_env()?,
             database_url: std::env::var("AIO_AGENT_DATABASE_URL")
                 .context("缺少插件专属数据库连接")?,
