@@ -17,6 +17,7 @@ pub struct Provider {
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProviderDraft {
+    #[serde(default)]
     pub label: String,
     pub endpoint: String,
     pub model: String,

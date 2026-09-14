@@ -495,7 +495,8 @@
           "type": "string"
         },
         "label": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "model": {
           "type": "string"
@@ -509,7 +510,6 @@
       },
       "additionalProperties": false,
       "required": [
-        "label",
         "endpoint",
         "model"
       ]

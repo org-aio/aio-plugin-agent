@@ -110,6 +110,23 @@ export async function verifyBrowser({
         await frame
           .getByRole("button", { name: "删除会话", exact: true })
           .waitFor();
+        if (process.env.AIO_MODEL_BROWSER_ONLY === "1") {
+          const { verifyModelControls } = await import("./model-browser.mjs");
+          reports.push({
+            name,
+            ...(await verifyModelControls({
+              page,
+              frame,
+              click,
+              agent,
+              conversation,
+              provider,
+              name,
+            })),
+          });
+          assert.deepEqual(errors, []);
+          continue;
+        }
         const input = frame.getByRole("textbox", {
           name: "消息输入",
           exact: true,

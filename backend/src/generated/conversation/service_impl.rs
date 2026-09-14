@@ -105,12 +105,17 @@ impl AgentService for AgentServiceImpl {
         id: Option<Uuid>,
         draft: ProviderDraft,
     ) -> ServiceResult<Provider> {
-        let label = util::text(&draft.label, 80, "名称")?;
         let model = util::text(&draft.model, 160, "模型")?;
-        self.core
+        let address = self
+            .core
             .config
             .endpoint(&draft.endpoint)
             .map_err(|e| bad(&e.to_string()))?;
+        let label = if draft.label.trim().is_empty() {
+            address.authority().chars().take(80).collect()
+        } else {
+            util::text(&draft.label, 80, "名称")?
+        };
         let endpoint = draft.endpoint.trim_end_matches('/');
         let existing = id;
         let id = id.unwrap_or_else(Uuid::new_v4);

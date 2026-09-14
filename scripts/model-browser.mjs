@@ -9,6 +9,9 @@ export async function verifyModelControls({
   provider,
   name,
 }) {
+  provider = (await agent("GET", "/settings")).providers.find(
+    (item) => item.id === provider.id,
+  );
   const selection = `${provider.label} · ${provider.model}`;
   const change = async (current, next, id) => {
     await click(frame.getByRole("button", { name: current, exact: true }));
@@ -45,6 +48,10 @@ export async function verifyModelControls({
     exact: true,
   });
   await click(endpoint);
+  assert.equal(
+    await frame.getByRole("textbox", { name: "名称", exact: true }).count(),
+    0,
+  );
   await page.keyboard.press("ControlOrMeta+a");
   const listed = page.waitForResponse(
     (response) =>
@@ -76,9 +83,22 @@ export async function verifyModelControls({
   saved.catch(() => {});
   // Compose 弹出菜单关闭后残留旧语义树，使用打开菜单前的保存按钮位置。
   await page.mouse.click(save.x + save.width / 2, save.y + save.height / 2);
-  assert.equal((await (await saved).json()).status, 200);
+  const result = await (await saved).json();
+  assert.equal(result.status, 200);
+  const updated = JSON.parse(Buffer.from(result.body).toString());
+  assert.equal(updated.label, new URL(provider.endpoint).host);
   await page.reload();
-  await frame.getByRole("button", { name: selection, exact: true }).waitFor();
+  await frame
+    .getByRole("button", {
+      name: `${updated.label} · ${updated.model}`,
+      exact: true,
+    })
+    .waitFor();
   await page.screenshot({ path: `test-results/model-switch-${name}.png` });
-  return { manualEndpoint: true, modelCatalog: true, switchModel: true };
+  return {
+    manualEndpoint: true,
+    modelCatalog: true,
+    switchModel: true,
+    automaticName: true,
+  };
 }

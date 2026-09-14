@@ -122,7 +122,6 @@ internal fun AgentDialogs(state: AgentState) {
                 confirmButton = { TextButton(dismiss) { Text("关闭") } },
             )
         is AgentDialog.ProviderEditor -> {
-            var label by remember(dialog) { mutableStateOf(dialog.provider?.label.orEmpty()) }
             var model by remember(dialog) { mutableStateOf(dialog.provider?.model.orEmpty()) }
             var endpoint by
                 remember(dialog) {
@@ -168,13 +167,6 @@ internal fun AgentDialogs(state: AgentState) {
                         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        OutlinedTextField(
-                            label,
-                            { label = it },
-                            label = { Text("名称") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "名称" },
-                        )
                         OutlinedTextField(
                             endpoint,
                             {
@@ -235,7 +227,7 @@ internal fun AgentDialogs(state: AgentState) {
                                 dialog.provider?.id,
                                 ProviderDraft(
                                     endpoint = endpoint.trim().trimEnd('/'),
-                                    label = label,
+                                    label = "",
                                     model = model,
                                     secret = if (clearSecret) "" else secret.ifEmpty { null },
                                 ),
@@ -243,7 +235,6 @@ internal fun AgentDialogs(state: AgentState) {
                         },
                         enabled =
                             !state.busy &&
-                                label.isNotBlank() &&
                                 model.isNotBlank() &&
                                 endpoint.isNotBlank(),
                     ) {
