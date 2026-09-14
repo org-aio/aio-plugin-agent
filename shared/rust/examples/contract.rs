@@ -6,6 +6,8 @@ use serde::Serialize;
 struct Contract {
     provider: Provider,
     provider_draft: ProviderDraft,
+    model_list_request: ModelListRequest,
+    model_selection: ModelSelection,
     conversation: Conversation,
     conversation_draft: ConversationDraft,
     message: Message,

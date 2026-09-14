@@ -24,6 +24,12 @@
     "message": {
       "$ref": "#/$defs/Message"
     },
+    "model_list_request": {
+      "$ref": "#/$defs/ModelListRequest"
+    },
+    "model_selection": {
+      "$ref": "#/$defs/ModelSelection"
+    },
     "prompt": {
       "$ref": "#/$defs/Prompt"
     },
@@ -43,6 +49,8 @@
   "required": [
     "provider",
     "provider_draft",
+    "model_list_request",
+    "model_selection",
     "conversation",
     "conversation_draft",
     "message",
@@ -396,6 +404,44 @@
         "matchedNodeIds",
         "activatedNodeIds"
       ]
+    },
+    "ModelListRequest": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "secret": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "endpoint"
+      ]
+    },
+    "ModelSelection": {
+      "type": "object",
+      "properties": {
+        "providerId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false
     },
     "Prompt": {
       "type": "object",

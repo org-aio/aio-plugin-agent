@@ -63,6 +63,7 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
         .route("/settings", get(controller::settings))
         .route("/memory", post(controller::memory_request))
         .route("/providers", post(controller::add_provider))
+        .route("/providers/models", post(controller::models))
         .route(
             "/providers/{id}",
             axum::routing::put(controller::edit_provider).delete(controller::delete_provider),
@@ -76,6 +77,10 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
             get(controller::thread).delete(controller::delete),
         )
         .route("/conversations/{id}/messages", post(controller::send))
+        .route(
+            "/conversations/{id}/model",
+            axum::routing::put(controller::select_model),
+        )
         .route("/conversations/{id}/cancel", post(controller::cancel))
         .layer(DefaultBodyLimit::max(256 * 1024))
         .layer(middleware::from_fn_with_state(ingress, authenticate))

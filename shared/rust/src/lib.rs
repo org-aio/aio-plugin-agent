@@ -24,6 +24,20 @@ pub struct ProviderDraft {
 }
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModelListRequest {
+    pub provider_id: Option<Uuid>,
+    pub endpoint: String,
+    pub secret: Option<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModelSelection {
+    pub provider_id: Option<Uuid>,
+}
+
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Conversation {
     pub id: Uuid,

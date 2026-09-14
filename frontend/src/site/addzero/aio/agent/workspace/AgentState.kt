@@ -148,6 +148,18 @@ internal class AgentState(private val scope: CoroutineScope) {
         }
     }
 
+    fun selectModel(provider: String) = run {
+        val current = thread ?: return@run
+        poll?.cancel()
+        try {
+            val updated = AgentClient.selectModel(current.conversation.id, provider.ifEmpty { null })
+            thread = current.copy(conversation = updated)
+            conversations = AgentClient.conversations()
+        } finally {
+            watch(generation)
+        }
+    }
+
     private fun watch(version: Int) {
         poll?.cancel()
         if (!running && !processing) return

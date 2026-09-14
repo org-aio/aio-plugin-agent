@@ -198,12 +198,15 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    state.settings.providers
-                        .find { it.id == thread.conversation.providerId }
-                        ?.model
-                        .orEmpty(),
-                    style = MaterialTheme.typography.labelSmall,
+                site.addzero.aio.agent.editor.Choice(
+                    "模型",
+                    listOf("" to "跟随空间模型") + state.settings.providers.map {
+                        it.id to "${it.label} · ${it.model}"
+                    },
+                    thread.conversation.providerId.orEmpty(),
+                    state::selectModel,
+                    enabled = !state.busy && !state.running &&
+                        thread.messages.none { it.status == "queued" },
                 )
                 Text(
                     state.spaces.firstOrNull { it.id == thread.conversation.spaceId }?.title

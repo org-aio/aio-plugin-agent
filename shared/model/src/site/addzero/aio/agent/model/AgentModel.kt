@@ -98,6 +98,18 @@ data class Message(
 )
 
 @Serializable
+data class ModelListRequest(
+    val endpoint: String,
+    val providerId: String? = null,
+    val secret: String? = null
+)
+
+@Serializable
+data class ModelSelection(
+    val providerId: String? = null
+)
+
+@Serializable
 data class Prompt(
     val content: String,
     val requestId: String

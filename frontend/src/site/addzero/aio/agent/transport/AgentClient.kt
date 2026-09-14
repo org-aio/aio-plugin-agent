@@ -78,6 +78,12 @@ internal object AgentClient {
 
     suspend fun settings(): Settings = read("GET", "/settings")
 
+    suspend fun models(request: ModelListRequest): List<String> =
+        read("POST", "/providers/models", Json.encodeToString(request))
+
+    suspend fun selectModel(id: String, provider: String?): Conversation =
+        read("PUT", "/conversations/$id/model", Json.encodeToString(ModelSelection(provider)))
+
     suspend fun conversations(): List<Conversation> = read("GET", "/conversations")
 
     suspend fun thread(id: String): Thread = read("GET", "/conversations/$id")

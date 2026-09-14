@@ -19,6 +19,16 @@ pub(super) struct ModelConnection {
 }
 
 #[derive(serde::Deserialize)]
+pub(super) struct ModelCatalog {
+    pub data: Vec<CatalogModel>,
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct CatalogModel {
+    pub id: String,
+}
+
+#[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MemoryRequest {
     pub method: String,

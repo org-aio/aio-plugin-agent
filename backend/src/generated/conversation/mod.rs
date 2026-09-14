@@ -5,6 +5,7 @@ mod memory;
 mod memory_tools;
 pub mod model;
 mod model_access;
+mod models;
 pub mod service;
 pub mod service_impl;
 mod store;

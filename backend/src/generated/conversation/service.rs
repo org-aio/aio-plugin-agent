@@ -5,6 +5,13 @@ use uuid::Uuid;
 #[async_trait]
 pub trait AgentService: Send + Sync {
     async fn settings(&self, scope: &Scope) -> ServiceResult<Settings>;
+    async fn models(&self, scope: &Scope, request: ModelListRequest) -> ServiceResult<Vec<String>>;
+    async fn select_model(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        selection: ModelSelection,
+    ) -> ServiceResult<Conversation>;
     async fn save_provider(
         &self,
         scope: &Scope,

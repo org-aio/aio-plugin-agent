@@ -9,9 +9,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import site.addzero.aio.agent.model.ModelListRequest
 import site.addzero.aio.agent.model.ProviderDraft
+import site.addzero.aio.agent.transport.AgentClient
 import site.addzero.aio.agent.workspace.*
 
 @Composable
@@ -126,6 +133,33 @@ internal fun AgentDialogs(state: AgentState) {
                 }
             var secret by remember(dialog) { mutableStateOf("") }
             var clearSecret by remember(dialog) { mutableStateOf(false) }
+            var models by remember(dialog) { mutableStateOf<List<String>>(emptyList()) }
+            var loading by remember(dialog) { mutableStateOf(false) }
+            var listError by remember(dialog) { mutableStateOf<String?>(null) }
+            var refresh by remember(dialog) { mutableStateOf(0) }
+            LaunchedEffect(endpoint, secret, clearSecret, refresh) {
+                models = emptyList()
+                listError = null
+                loading = endpoint.isNotBlank()
+                if (!loading) return@LaunchedEffect
+                try {
+                    delay(500)
+                    models = AgentClient.models(
+                        ModelListRequest(
+                            endpoint = endpoint.trim().trimEnd('/'),
+                            providerId = dialog.provider?.id,
+                            secret = if (clearSecret) "" else secret.ifEmpty { null },
+                        )
+                    )
+                    if (models.isEmpty()) listError = "服务未返回可用模型"
+                } catch (c: CancellationException) {
+                    throw c
+                } catch (c: Throwable) {
+                    listError = c.message?.take(200) ?: "获取模型列表失败"
+                } finally {
+                    loading = false
+                }
+            }
             AlertDialog(
                 dismiss,
                 title = { Text(if (dialog.provider == null) "添加模型" else "编辑模型") },
@@ -139,20 +173,18 @@ internal fun AgentDialogs(state: AgentState) {
                             { label = it },
                             label = { Text("名称") },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Choice(
-                            "服务地址",
-                            state.settings.allowedEndpoints.map { it to it },
-                            endpoint,
-                            { endpoint = it },
+                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "名称" },
                         )
                         OutlinedTextField(
-                            model,
-                            { model = it },
-                            label = { Text("模型 ID") },
+                            endpoint,
+                            {
+                                endpoint = it
+                                model = ""
+                            },
+                            label = { Text("服务地址") },
+                            placeholder = { Text("https://api.example.com/v1") },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "服务地址" },
                         )
                         OutlinedTextField(
                             secret,
@@ -165,7 +197,7 @@ internal fun AgentDialogs(state: AgentState) {
                             },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "API 密钥" },
                             enabled = !clearSecret,
                         )
                         if (dialog.provider?.hasSecret == true)
@@ -173,6 +205,26 @@ internal fun AgentDialogs(state: AgentState) {
                                 Checkbox(clearSecret, { clearSecret = it })
                                 Text("移除已保存密钥")
                             }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                Choice(
+                                    "模型",
+                                    models.map { it to it },
+                                    model,
+                                    { model = it },
+                                    enabled = !loading && models.isNotEmpty(),
+                                )
+                            }
+                            Tool(
+                                "刷新模型列表",
+                                Icons.Default.Refresh,
+                                !loading && endpoint.isNotBlank(),
+                            ) {
+                                refresh++
+                            }
+                        }
+                        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        listError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         Feedback(state)
                     }
                 },
@@ -182,7 +234,7 @@ internal fun AgentDialogs(state: AgentState) {
                             state.saveProvider(
                                 dialog.provider?.id,
                                 ProviderDraft(
-                                    endpoint = endpoint,
+                                    endpoint = endpoint.trim().trimEnd('/'),
                                     label = label,
                                     model = model,
                                     secret = if (clearSecret) "" else secret.ifEmpty { null },
@@ -239,19 +291,29 @@ internal fun Choice(
     items: List<Pair<String, String>>,
     value: String,
     onChange: (String) -> Unit,
+    enabled: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Column {
         Text(label, style = MaterialTheme.typography.labelMedium)
         Box {
-            OutlinedButton({ expanded = true }, Modifier.fillMaxWidth()) {
-                Text(items.firstOrNull { it.first == value }?.second ?: "未选择", Modifier.weight(1f))
+            OutlinedButton({ expanded = true }, Modifier.fillMaxWidth(), enabled = enabled) {
+                Text(
+                    items.firstOrNull { it.first == value }?.second ?: value.ifEmpty { "未选择" },
+                    Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Icon(Icons.Default.ArrowDropDown, null)
             }
-            DropdownMenu(expanded, { expanded = false }) {
+            DropdownMenu(
+                expanded && enabled,
+                { expanded = false },
+                modifier = Modifier.heightIn(max = 320.dp),
+            ) {
                 items.forEach { item ->
                     DropdownMenuItem(
-                        text = { Text(item.second) },
+                        text = { Text(item.second, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                         onClick = {
                             onChange(item.first)
                             expanded = false

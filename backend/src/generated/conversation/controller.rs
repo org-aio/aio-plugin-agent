@@ -9,6 +9,21 @@ use uuid::Uuid;
 
 type Service = State<Arc<dyn AgentService>>;
 type Identity = Extension<Scope>;
+pub async fn models(
+    State(service): Service,
+    Extension(scope): Identity,
+    Json(request): Json<ModelListRequest>,
+) -> ServiceResult<Json<Vec<String>>> {
+    Ok(Json(service.models(&scope, request).await?))
+}
+pub async fn select_model(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path(id): Path<Uuid>,
+    Json(selection): Json<ModelSelection>,
+) -> ServiceResult<Json<Conversation>> {
+    Ok(Json(service.select_model(&scope, id, selection).await?))
+}
 pub async fn settings(
     State(service): Service,
     Extension(scope): Identity,

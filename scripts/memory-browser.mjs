@@ -49,6 +49,11 @@ export async function verifyBrowser({
   agent,
   canary,
 }) {
+  provider = await agent("PUT", `/providers/${provider.id}`, {
+    label: "浏览器模型",
+    endpoint: provider.endpoint,
+    model: provider.model,
+  });
   const port = Number(process.env.AIO_MEMORY_BROWSER_PORT || 4298);
   const origin = `http://127.0.0.1:${port}`;
   const preview = spawn(process.execPath, ["scripts/preview.mjs"], {
@@ -222,6 +227,16 @@ export async function verifyBrowser({
             .length,
           4,
         );
+        const { verifyModelControls } = await import("./model-browser.mjs");
+        const modelReport = await verifyModelControls({
+          page,
+          frame,
+          click,
+          agent,
+          conversation,
+          provider,
+          name,
+        });
         reports.push({
           name,
           canvasColors: colors.size,
@@ -232,6 +247,7 @@ export async function verifyBrowser({
           reload: true,
           consoleErrors: errors.length,
           ...graphReport,
+          ...modelReport,
         });
       } catch (error) {
         await page.screenshot({

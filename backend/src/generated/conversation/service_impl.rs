@@ -78,6 +78,17 @@ impl AgentServiceImpl {
 
 #[async_trait]
 impl AgentService for AgentServiceImpl {
+    async fn models(&self, scope: &Scope, request: ModelListRequest) -> ServiceResult<Vec<String>> {
+        super::models::list(&self.core, scope, request).await
+    }
+    async fn select_model(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        selection: ModelSelection,
+    ) -> ServiceResult<Conversation> {
+        super::models::select(&self.core, scope, id, selection).await
+    }
     async fn settings(&self, scope: &Scope) -> ServiceResult<Settings> {
         let providers = sqlx::query("SELECT id,label,endpoint,model,secret IS NOT NULL AS has_secret FROM agent_providers WHERE tenant_id=$1 AND user_id=$2 ORDER BY label")
             .bind(&scope.tenant).bind(&scope.user).fetch_all(&self.core.pool).await?.into_iter().map(store::provider).collect();

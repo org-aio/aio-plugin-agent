@@ -142,6 +142,24 @@ const broker = await listen(async (req, res) => {
   }
 });
 const upstream = await listen(async (req, res) => {
+  if (req.method === "GET" && req.url === "/v1/models") {
+    if (req.headers.authorization === "Bearer redirect") {
+      res.writeHead(302, { location: `${upstream}/v1/models` }).end();
+    } else if (req.headers.authorization === "Bearer invalid-response") {
+      res
+        .writeHead(200, { "content-type": "application/json" })
+        .end('{"models":[]}');
+    } else if (req.headers.authorization !== "Bearer provider-test-key") {
+      res.writeHead(401).end(canary);
+    } else {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          data: [{ id: "slow" }, { id: "memory-test" }, { id: "memory-test" }],
+        }),
+      );
+    }
+    return;
+  }
   const input = await jsonBody(req);
   modelRequests.push(input);
   const compiling = messageText(input.messages[0]).startsWith("将 source.text");
@@ -480,6 +498,7 @@ async function verify() {
     pool,
     canary,
     blockedRecalls,
+    modelRequests,
   });
   await stop(backend);
   await stop(child);
