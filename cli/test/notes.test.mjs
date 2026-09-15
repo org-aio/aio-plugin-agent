@@ -149,3 +149,19 @@ test('缺少模型或登录时只报告就绪状态，不读取笔记', () => fi
   assert.equal(status.configured, false);
   assert.deepEqual(status.missing, ['spaceId', 'modelBinding', 'model', 'login']);
 }));
+
+test('持续失败的超大笔记不能饿死后续待核对产物', () => fixture(async root => {
+  const notes = join(root, 'notes'); await mkdir(notes);
+  for (const [name, content] of [['a-large.md', 'x'.repeat(100_000)], ['b-ready.md', '待核对知识']]) {
+    const path = join(notes, name); await writeFile(path, content); await utimes(path, old, old);
+  }
+  const client = memoryClient(); client.setPending(true);
+  const config = { roots: [notes], output: join(root, 'wiki'), spaceId: space, modelBinding: 'binding', model: 'test-model', cleanup: 'none', batchSize: 1 };
+  assert.equal((await run(config, client)).failed, 1);
+  assert.equal((await run(config, client)).pending, 1);
+  client.setPending(false);
+  assert.equal((await run(config, client)).failed, 1);
+  assert.equal((await run(config, client)).verified, 1);
+  assert.equal(client.captures.size, 1);
+  assert.equal(await readFile(join(notes, 'b-ready.md'), 'utf8'), '待核对知识');
+}));

@@ -90,9 +90,13 @@ export async function run(config, client, options = {}) {
       notes.push(note);
       if (note.kind === 'file' && !canonical.has(note.identity)) canonical.set(note.identity, note.key);
     }
-    // 新资料先收件，避免持续失败的旧任务占满每次批次。
+    // 新资料先收件，旧资料按处理序号轮转；永久失败不能挡住后续产物核对。
     const keyFor = note => digest(JSON.stringify([scope, note.key]));
-    notes.sort((a, b) => Number(Boolean(state.records[keyFor(a)])) - Number(Boolean(state.records[keyFor(b)])));
+    const attemptFor = note => {
+      const record = state.records[keyFor(note)];
+      return record?.identity === note.identity ? (record.attempt || 0) : 0;
+    };
+    notes.sort((a, b) => attemptFor(a) - attemptFor(b) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     let batch = 0;
     for (const note of notes) {
       const key = keyFor(note);
@@ -101,6 +105,8 @@ export async function run(config, client, options = {}) {
       if (Date.now() - note.modified < 15 * 60_000) { report.skipped++; continue; }
       if (batch >= (config.batchSize || 20)) { report.skipped++; continue; }
       const record = previous?.identity === note.identity ? previous : { identity: note.identity, path: note.key, digest: note.digest, sources: [] };
+      state.attempt = (state.attempt || 0) + 1;
+      record.attempt = state.attempt;
       // 已验证记录也重新读取来源和版本；删除或撤权后不能沿用旧的清理许可。
       try {
         const parts = chunks(note);
