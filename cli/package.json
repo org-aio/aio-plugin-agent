@@ -1,0 +1,11 @@
+{
+  "name": "@zjarlin/aio-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AIO 智能体记忆与本机笔记整理 CLI",
+  "bin": { "aio-agent": "src/main.mjs" },
+  "files": ["src", "README.md"],
+  "engines": { "node": ">=22.19.0" },
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

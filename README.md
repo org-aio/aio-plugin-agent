@@ -4,6 +4,8 @@
 
 运行时边界见 [Agent 运行时](runtime/README.md)。复用 Pi AgentSession、模型适配器、流处理和原生扩展工具循环；AIO 保留空间授权、秘密隔离、任务持久化和知识提交，通过无 UI 依赖的 JSON 进程协议连接。
 
+命令行与本机笔记见 [中文 CLI 指南](cli/README.md)：安装 `aio-agent`，查询同一空间的记忆，将本地 Markdown/TXT 或指定 iCloud 备忘录账号交给空间绑定的模型整理为 wiki 和图谱，并在核对后按配置清理原文件。
+
 ## 子插件规范
 
 - 父插件：`aio-plugin-agent`。

@@ -297,6 +297,11 @@ async function verify() {
     path: "/spaces",
     body: { title: `集成测试 ${randomUUID()}`, modelBinding: provider.id },
   });
+  if (process.env.AIO_MEMORY_NOTES_ONLY === "1") {
+    const { verifyLocalNotes } = await import("./memory-local-notes-tests.mjs");
+    await verifyLocalNotes({ agent, eventually, provider, canary, modelRequests });
+    return;
+  }
   if (process.env.AIO_MEMORY_BROWSER_ONLY === "1") {
     const { verifyBrowser } = await import("./memory-browser.mjs");
     await verifyBrowser({
