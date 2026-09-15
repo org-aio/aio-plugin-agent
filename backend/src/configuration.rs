@@ -84,6 +84,9 @@ impl RuntimeConfig {
             self.allowed_endpoints.contains(value),
             "模型地址未被宿主授权"
         );
+        if self.gateway.is_some() {
+            return az_plugin_contract::process::model_endpoint(value).map_err(anyhow::Error::msg);
+        }
         let url = Url::parse(value).context("模型地址无效")?;
         ensure!(
             url.username().is_empty()
@@ -100,5 +103,39 @@ impl RuntimeConfig {
             "模型地址必须使用 HTTPS，开发回环地址需显式授权"
         );
         Ok(url)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn private_http_requires_gateway_and_an_exact_host_grant() {
+        let endpoint = "http://192.168.31.252:18080/v1";
+        let mut config = RuntimeConfig {
+            engine: crate::runtime::EngineConfig {
+                node: "node".into(),
+                directory: "runtime".into(),
+            },
+            gateway: None,
+            database_url: String::new(),
+            encryption_key: [0; 32],
+            allowed_endpoints: [endpoint.to_owned()].into(),
+            generation_timeout: Duration::from_secs(120),
+            allow_loopback: false,
+            memory: None,
+        };
+        assert!(config.endpoint(endpoint).is_err());
+        config.gateway = Some(Gateway {
+            socket: "/broker/gateway.sock".into(),
+            token: String::new(),
+        });
+        assert!(config.endpoint(endpoint).is_ok());
+        assert!(config.endpoint("http://192.168.31.253:18080/v1").is_err());
+        config
+            .allowed_endpoints
+            .insert("http://169.254.169.254/latest".into());
+        assert!(config.endpoint("http://169.254.169.254/latest").is_err());
     }
 }

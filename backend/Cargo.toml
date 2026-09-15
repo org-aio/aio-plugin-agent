@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 az-agent-model = { path = "../shared/rust" }
-az-plugin-contract = { git = "https://github.com/zjarlin/aio-platform.git", rev = "f937a5dac18263313da288582c257cb42e1f416d" }
+az-plugin-contract = { git = "https://github.com/zjarlin/aio-platform.git", rev = "5234b354370554504d6503279d3e45af061e04a1" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
