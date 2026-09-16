@@ -27,3 +27,5 @@ await writeFile(
   `${directory}/settings.html`,
   page.replace("<head>", '<head><meta name="aio-page" content="settings">'),
 );
+
+await writeFile(`${directory}/skills.html`, page.replace("<head>", '<head><meta name="aio-page" content="skills">'));

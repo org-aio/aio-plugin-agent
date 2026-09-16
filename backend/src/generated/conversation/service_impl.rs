@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 pub struct AgentServiceImpl {
-    pub(super) core: Arc<Core>,
+    pub(crate) core: Arc<Core>,
 }
 pub(crate) struct Core {
     pub pool: PgPool,

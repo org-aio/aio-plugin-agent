@@ -60,6 +60,11 @@ async fn authenticate(
 
 pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
     let application = Router::new()
+        .route("/skills", post(crate::generated::skills::controller::page))
+        .route(
+            "/worker/skills.sync",
+            post(crate::generated::skills::controller::worker),
+        )
         .route("/settings", get(controller::settings))
         .route(
             "/tools/web-search",
@@ -86,7 +91,7 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
             axum::routing::put(controller::select_model),
         )
         .route("/conversations/{id}/cancel", post(controller::cancel))
-        .layer(DefaultBodyLimit::max(256 * 1024))
+        .layer(DefaultBodyLimit::max(3 * 1024 * 1024))
         .layer(middleware::from_fn_with_state(ingress, authenticate))
         .with_state(service);
     Router::new()

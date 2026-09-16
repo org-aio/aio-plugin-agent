@@ -3,6 +3,7 @@ mod graph;
 mod memory;
 mod models;
 mod settings;
+mod skills;
 mod state;
 mod transport;
 use dioxus::prelude::*;
@@ -18,6 +19,29 @@ fn main() {
 }
 #[component]
 fn App() -> Element {
+    let mut page = use_signal(|| None::<String>);
+    use_future(move || async move {
+        let name = document::eval(
+            "return document.querySelector('meta[name=aio-page]')?.content || 'chat';",
+        )
+        .await
+        .unwrap_or_default()
+        .as_str()
+        .unwrap_or("chat")
+        .to_owned();
+        page.set(Some(name));
+    });
+    rsx! {
+        az_ui_components::UiStylesheets { relative_paths: true }
+        match page().as_deref() {
+            Some("skills") => rsx! { skills::SkillPage {} },
+            Some(_) => rsx! { AgentApp {} },
+            None => rsx! { p { "正在加载" } },
+        }
+    }
+}
+#[component]
+fn AgentApp() -> Element {
     let mut state = use_signal(AgentState::default);
     let mut settings_page = use_signal(|| None::<bool>);
     use_context_provider(|| state);

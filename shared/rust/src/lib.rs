@@ -1,5 +1,7 @@
+mod skills;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+pub use skills::*;
 use uuid::Uuid;
 mod graph;
 mod search;

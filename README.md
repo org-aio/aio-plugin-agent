@@ -57,3 +57,25 @@ npm run test:browser
 网页对话支持请求“打开 Postman”。先在 AIO“我的设备”为已升级的 macOS worker 启用应用控制。Agent 用当前账号身份列出设备并下发固定的打开应用能力，凭客户端返回的进程 ID 确认完成；多台设备时先选择目标。等待超时只报告结果待确认，不重新执行。宿主需要授权 `AIO_PROCESS_WORKER_CAPABILITIES=desktop.open-app`。此能力不提供任意 shell、键盘或鼠标控制。
 
 “打开 应用名”完整指令直接调用设备列表与应用工具，回复由真实任务结果生成，不依赖模型是否愿意调用工具；仅自动选取唯一在线且已授权设备。多台在线设备时要求指定目标。
+
+## 设备与 Skill
+
+工作空间菜单为「智能体 → 对话 / 记忆图谱 / Skill 管理」。记忆图谱由可选 Memory 子插件提供。
+配对使用 AIO 宿主的用户/租户体系，设备凭据可撤销；智能体通过能力协议调用 worker，
+不直接访问客户端磁盘或其他插件的数据库。Skill 管理目前是 Agent 内的独立 feature/service，
+不是一个需要再安装和登录的插件。宿主不会因卸载智能体而撤销其他插件使用的设备。
+
+在已配对电脑运行 `aio-space skills-enable --path ~/.agents/skills`，即可每 30 秒双向同步；
+`aio-space skills-sync` 立即运行，`aio-space skills-disable` 暂停并撤回同步能力。
+正文和脚本、图片等资源一同同步；隐藏目录、Git、缓存和凭据文件不进入云端。
+网页支持新建、编辑、删除文件和处理双端冲突。单边变化自动传播，双边变化需要选择版本；
+本机覆盖/删除前留备份，云端保留加密历史。设备离线后恢复会重新比较，不按时间戳覆盖。
+对话提供 `skill_list` / `skill_read` 按需读取当前用户技能，同步和读取本身都不会运行技能脚本。
+
+参考设计：[DeepSeek Harness](https://www.deepseek.com/harness/) 将工具、技能、执行环境和 UI 作为可组合能力；
+[字节 UI-TARS](https://github.com/bytedance/UI-TARS-desktop) 分开本地/远程电脑与浏览器操作器。
+AIO 保留统一身份和远程设备通道，各业务能力与数据归插件所有。公开项目不代表豆包闭源客户端的内部实现。
+
+验证：`cargo test -p az-agent-server --lib`；`AIO_TEST_DATABASE_URL=... node scripts/test-skills.mjs`；
+构建前端后运行 `AIO_TEST_DATABASE_URL=... node scripts/test-skills-browser.mjs`。
+测试数据库必须是隔离的本机 PostgreSQL。浏览器验证包含桌面/移动端、新建、编辑、删除确认和溢出检查。

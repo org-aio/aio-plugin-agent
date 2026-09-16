@@ -70,6 +70,6 @@ pub fn load() -> Result<Option<(RuntimeConfig, Ingress)>> {
 
 pub async fn describe() -> axum::Json<serde_json::Value> {
     axum::Json(
-        serde_json::json!({"label":"智能体","pages":[{"id":"chat","label":"智能体","entry":"index.html","scene":["workspace","工作空间"],"menu_path":[],"permission":null,"surface":"workspace"},{"id":"settings","label":"智能体设置","entry":"settings.html","scene":null,"menu_path":[],"permission":null,"surface":"fullscreen"}]}),
+        serde_json::json!({"label":"智能体","pages":[{"id":"chat","label":"对话","entry":"index.html","scene":["workspace","工作空间"],"menu_path":["智能体"],"permission":null,"surface":"workspace"},{"id":"skills","label":"Skill 管理","entry":"skills.html","scene":["workspace","工作空间"],"menu_path":["智能体"],"permission":null,"surface":"workspace"},{"id":"settings","label":"智能体设置","entry":"settings.html","scene":null,"menu_path":[],"permission":null,"surface":"fullscreen"}]}),
     )
 }
