@@ -11,7 +11,7 @@ artifact = "dist/agent-server"
 host_version = ">=2026.9.11"
 
 [plugin.runtime.process]
-image = "sha256:8ae75514bb53a1386dd623789f02cdc7648bcc2d37fe6dcef2fb684c15d1eadc"
+image = "sha256:95c1e73abd6aee38be7b4f756747f7d160eba6eb30b92b7868b4b93dfe213a06"
 endpoints = ["https://api.openai.com/v1", "http://192.168.31.252:18080/v1"]
 services = ["https://github.com/zjarlin/aio-plugin-agent-memory.git"]
 

@@ -14,3 +14,5 @@ package-runtime.mjs 打包 Pi 执行模块并按锁文件安装生产依赖。ru
 # v2 Process
 
 build-process.sh 构建正式 Linux ELF，前端先运行 npm run build。Containerfile 的 runtime target 构建 Pi 运行镜像，清单固定其完整镜像摘要。整包通过 aio-platform 的 az-plugin-bundle package 示例生成并上传宿主 v2 发布接口。
+
+宿主以固定 UID/GID `65532:65532` 运行 process。镜像内的 node 用户必须与之对应，并在系统账户记录中提供 `/app` 主目录；Rust 清空子进程环境后，Pi 仍会通过系统用户记录解析路径。不要依赖开发机的用户或主目录配置。构建镜像后执行 `node scripts/test-process-image.mjs sha256:<镜像摘要>`，在禁网、只读文件系统和生产 UID 下验证 Pi 流式会话及断线退出。测试使用合成模型响应，不调用真实模型，也不挂载宿主配置或凭据。

@@ -5,6 +5,7 @@ RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
 FROM node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS runtime
 WORKDIR /app
+RUN groupmod --gid 65532 node && usermod --uid 65532 --gid 65532 --home /app node
 COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node dist/runtime ./runtime
 ENV AIO_AGENT_BIND=0.0.0.0 AIO_PLUGIN_PORT=8080 AIO_AGENT_RUNTIME_DIR=/app/runtime AIO_AGENT_NODE=/usr/local/bin/node
