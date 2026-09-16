@@ -10,11 +10,18 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Arguments {
-    worker_id: String,
+    #[serde(default)]
+    worker_id: Option<String>,
     application: String,
 }
 
-pub(super) fn tools(core: &Core, scope: &Scope, assistant: Uuid) -> Vec<Arc<dyn Tool>> {
+pub(super) fn tools(
+    core: &Core,
+    scope: &Scope,
+    assistant: Uuid,
+    selected: Option<Uuid>,
+    prompt: &str,
+) -> Vec<Arc<dyn Tool>> {
     let Some(gateway) = core.config.gateway.as_ref() else {
         return vec![];
     };
@@ -33,6 +40,8 @@ pub(super) fn tools(core: &Core, scope: &Scope, assistant: Uuid) -> Vec<Arc<dyn 
         assistant,
         endpoint: "http://localhost/workers".into(),
         wait: Duration::from_secs(45),
+        selected,
+        prompt: prompt.into(),
     });
     vec![Arc::new(List(broker.clone())), Arc::new(Open(broker))]
 }
@@ -45,6 +54,8 @@ struct Broker {
     assistant: Uuid,
     endpoint: String,
     wait: Duration,
+    selected: Option<Uuid>,
+    prompt: String,
 }
 
 impl Broker {
@@ -68,7 +79,7 @@ impl Broker {
         let mut hash = Sha256::new();
         for part in [
             self.assistant.as_bytes().as_slice(),
-            args.worker_id.as_bytes(),
+            args.worker_id.as_deref().unwrap_or_default().as_bytes(),
             args.application.as_bytes(),
         ] {
             hash.update((part.len() as u64).to_be_bytes());
@@ -103,11 +114,16 @@ impl Tool for List {
 #[async_trait::async_trait]
 impl Tool for Open {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"device_open_application","description":"在用户已授权的在线设备上打开已安装应用。先调用 device_list；多台设备且用户未指定时先询问。仅 complete 且有运行进程证明时可报告打开成功。","parameters":{"type":"object","properties":{"worker_id":{"type":"string"},"application":{"type":"string","maxLength":128}},"required":["worker_id","application"],"additionalProperties":false}}})
+        json!({"type":"function","function":{"name":"device_open_application","description":"在用户已授权的在线设备上打开已安装应用。先调用 device_list；多台设备且用户未指定时，系统自动暂停并请求用户选择。支持打开应用，不支持编辑应用内容或任意文件操作。仅 complete 且有运行进程证明时可报告打开成功。","parameters":{"type":"object","properties":{"worker_id":{"type":"string"},"application":{"type":"string","maxLength":128}},"required":["application"],"additionalProperties":false}}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
-        let args: Arguments = serde_json::from_value(arguments)?;
-        Uuid::parse_str(&args.worker_id).context("设备 ID 无效")?;
+        let mut args: Arguments = serde_json::from_value(arguments)?;
+        let devices = self.0.request(json!({"operation":"list"})).await?;
+        let device = super::device_routing::select(&devices, self.0.selected, &self.0.prompt)?;
+        let id = device["id"].as_str().context("设备 ID 缺失")?;
+        Uuid::parse_str(id).context("设备 ID 无效")?;
+        // 路由以用户确定的目标为准，忽略模型自行猜测的设备 ID。
+        args.worker_id = Some(id.into());
         ensure!(
             !args.application.trim().is_empty() && args.application.len() <= 128,
             "应用名称无效"
@@ -125,7 +141,9 @@ impl Tool for Open {
                             && result["pid"].as_u64().is_some_and(|pid| pid > 0),
                         "设备未返回应用进程证明"
                     );
-                    return Ok(json!({"taskId":id,"state":"complete","result":result}));
+                    return Ok(
+                        json!({"taskId":id,"state":"complete","result":result,"device":device}),
+                    );
                 }
                 "queued" | "running" => {
                     if tokio::time::Instant::now() >= deadline {

@@ -16,6 +16,30 @@ pub(crate) async fn generate(
     tools: Vec<Arc<dyn Tool>>,
     output: mpsc::Sender<Delta>,
 ) -> Result<()> {
+    continue_run(
+        client,
+        gateway,
+        endpoint,
+        model,
+        secret,
+        az_agent_engine::RunState::new(messages),
+        tools,
+        output,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn continue_run(
+    client: &reqwest::Client,
+    gateway: Option<&crate::configuration::Gateway>,
+    endpoint: &str,
+    model: &str,
+    secret: Option<&str>,
+    state: az_agent_engine::RunState,
+    tools: Vec<Arc<dyn Tool>>,
+    output: mpsc::Sender<Delta>,
+) -> Result<()> {
     let mut request = if let Some(gateway) = gateway {
         client
             .post("http://localhost/egress")
@@ -30,5 +54,5 @@ pub(crate) async fn generate(
     if let Some(secret) = secret {
         request = request.bearer_auth(secret);
     }
-    az_agent_engine::run(request, model, messages, tools, output).await
+    az_agent_engine::resume(request, model, state, tools, output).await
 }

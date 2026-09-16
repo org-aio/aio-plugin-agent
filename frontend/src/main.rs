@@ -6,6 +6,7 @@ mod settings;
 mod skills;
 mod state;
 mod transport;
+mod user_input;
 use dioxus::prelude::*;
 use state::AgentState;
 fn main() {

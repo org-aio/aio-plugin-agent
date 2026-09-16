@@ -89,7 +89,7 @@ const server = createServer(async (req, res) => {
       if (
         !["GET", "POST", "PUT", "DELETE"].includes(input.method) ||
         typeof input.path !== "string" ||
-        !/^\/(settings|providers|conversations|memory|tools)(\/[a-zA-Z0-9/-]+)?$/.test(
+        !/^\/(settings|providers|conversations|memory|tools|devices)(\/[a-zA-Z0-9/-]+)?$/.test(
           input.path,
         ) ||
         !Array.isArray(input.body) ||
@@ -106,8 +106,9 @@ const server = createServer(async (req, res) => {
           headers: {
             "content-type": "application/json",
             "x-aio-token": config.ingressToken,
-            "x-aio-tenant-id": "preview",
-            "x-aio-user-id": "developer",
+            "x-aio-tenant-id":
+              process.env.AIO_AGENT_PREVIEW_TENANT || "preview",
+            "x-aio-user-id": process.env.AIO_AGENT_PREVIEW_USER || "developer",
           },
           body: input.method === "GET" ? undefined : Buffer.from(input.body),
           signal: AbortSignal.timeout(10000),

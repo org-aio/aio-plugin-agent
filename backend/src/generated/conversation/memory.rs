@@ -11,6 +11,7 @@ pub async fn safe_thread(
     strict: bool,
 ) -> super::model::ServiceResult<super::model::Thread> {
     let mut thread = super::store::thread(&core.pool, scope, id).await?;
+    thread.pending_input = super::user_input::pending(core, scope, id).await?;
     let Some(space) = &thread.conversation.space_id else {
         return Ok(thread);
     };
@@ -68,6 +69,14 @@ pub async fn safe_thread(
         }
         message.activated_node_ids.retain(|id| visible.contains(id));
         message.matched_node_ids.retain(|id| visible.contains(id));
+    }
+    if thread.pending_input.as_ref().is_some_and(|input| {
+        thread.messages.iter().any(|message| {
+            message.id == input.assistant_id
+                && message.memory_status.as_deref() == Some("unavailable")
+        })
+    }) {
+        thread.pending_input = None;
     }
     Ok(thread)
 }

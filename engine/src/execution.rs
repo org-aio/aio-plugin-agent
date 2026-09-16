@@ -1,4 +1,4 @@
-use crate::{Delta, Tool, stream};
+use crate::{Delta, InputRequired, RunState, Tool, stream};
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::{collections::HashSet, sync::Arc};
@@ -8,7 +8,18 @@ use tokio::sync::mpsc::Sender;
 pub async fn run(
     request: reqwest::RequestBuilder,
     model: &str,
-    mut messages: Vec<Value>,
+    messages: Vec<Value>,
+    tools: Vec<Arc<dyn Tool>>,
+    output: Sender<Delta>,
+) -> Result<()> {
+    resume(request, model, RunState::new(messages), tools, output).await
+}
+
+/// 从保存的工具边界继续，宿主在调用前重新校验身份、模型和设备权限。
+pub async fn resume(
+    request: reqwest::RequestBuilder,
+    model: &str,
+    mut state: RunState,
     tools: Vec<Arc<dyn Tool>>,
     output: Sender<Delta>,
 ) -> Result<()> {
@@ -20,39 +31,43 @@ pub async fn run(
             .context("工具名称缺失")?;
         ensure!(!name.is_empty() && names.insert(name), "工具名称重复或为空");
     }
-    let mut tokens = 0i64;
-    for _ in 0..8 {
-        ensure!(
-            serde_json::to_vec(&messages)?.len() <= 512000,
-            "Agent 上下文超过配额"
-        );
-        let mut body = json!({"model":model,"messages":messages,"stream":true,"stream_options":{"include_usage":true}});
-        if !definitions.is_empty() {
-            body["tools"] = json!(definitions);
-        }
-        let response = request
-            .try_clone()
-            .context("模型请求不可重用")?
-            .json(&body)
-            .send()
-            .await
-            .context("模型服务连接失败")?;
-        let completion = stream::completion(response, &output).await?;
-        tokens = tokens.saturating_add(completion.tokens);
-        output.send(Delta::Tokens(tokens)).await?;
-        if completion.calls.is_empty() {
-            ensure!(!completion.text.is_empty(), "模型没有返回内容");
-            return Ok(());
-        }
-        let mut ids = HashSet::new();
-        for call in completion.calls.values() {
+    loop {
+        if state.pending.is_empty() {
+            ensure!(state.rounds_left > 0, "Agent 已达到 8 轮执行上限");
+            state.rounds_left -= 1;
             ensure!(
-                !call.id.is_empty() && ids.insert(&call.id),
-                "工具调用 ID 无效"
+                serde_json::to_vec(&state.messages)?.len() <= 512000,
+                "Agent 上下文超过配额"
             );
+            let mut body = json!({"model":model,"messages":state.messages,"stream":true,"stream_options":{"include_usage":true}});
+            if !definitions.is_empty() {
+                body["tools"] = json!(definitions);
+            }
+            let response = request
+                .try_clone()
+                .context("模型请求不可重用")?
+                .json(&body)
+                .send()
+                .await
+                .context("模型服务连接失败")?;
+            let completion = stream::completion(response, &output).await?;
+            state.tokens = state.tokens.saturating_add(completion.tokens);
+            output.send(Delta::Tokens(state.tokens)).await?;
+            if completion.calls.is_empty() {
+                ensure!(!completion.text.is_empty(), "模型没有返回内容");
+                return Ok(());
+            }
+            let mut ids = HashSet::new();
+            for call in completion.calls.values() {
+                ensure!(
+                    !call.id.is_empty() && ids.insert(&call.id),
+                    "工具调用 ID 无效"
+                );
+            }
+            state.messages.push(json!({"role":"assistant","content":completion.text,"tool_calls":completion.calls.values().collect::<Vec<_>>()}));
+            state.pending = completion.calls.into_values().collect();
         }
-        messages.push(json!({"role":"assistant","content":completion.text,"tool_calls":completion.calls.values().collect::<Vec<_>>()}));
-        for call in completion.calls.values() {
+        while let Some(call) = state.pending.first().cloned() {
             let index = definitions
                 .iter()
                 .position(|definition| definition["function"]["name"] == call.function.name)
@@ -73,17 +88,31 @@ pub async fn run(
             };
             // 参数格式错误不能执行工具；返回固定信息，让模型在轮数限制内修正。
             let value = match arguments {
-                Ok(arguments) => tools[index].invoke(arguments).await.unwrap_or_else(
-                    |_| json!({"error":"工具执行失败，请检查参数、插件设置或稍后重试"}),
-                ),
+                Ok(arguments) => match tools[index].invoke(arguments).await {
+                    Ok(value) => value,
+                    Err(error) => {
+                        if let Some(input) = error.downcast_ref::<InputRequired>() {
+                            output
+                                .send(Delta::Waiting {
+                                    state,
+                                    input: input.clone(),
+                                })
+                                .await?;
+                            return Ok(());
+                        }
+                        json!({"error":"工具执行失败，请检查参数、插件设置或稍后重试"})
+                    }
+                },
                 Err(_) => {
                     json!({"error":"工具参数格式无效；请按工具 schema 发送 JSON 对象。无参数工具也请使用 {}。本次没有执行。"})
                 }
             };
             let content = serde_json::to_string(&value)?;
             ensure!(content.len() <= 64000, "工具结果超过配额");
-            messages.push(json!({"role":"tool","tool_call_id":call.id,"content":content}));
+            state
+                .messages
+                .push(json!({"role":"tool","tool_call_id":call.id,"content":content}));
+            state.pending.remove(0);
         }
     }
-    anyhow::bail!("Agent 已达到 8 轮执行上限")
 }

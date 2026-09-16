@@ -9,3 +9,5 @@
 验证：`cargo test -p az-agent-engine`。
 
 无参数且明确禁止额外字段的对象工具支持空 arguments；其他非法 JSON 只返回工具错误，模型可在 8 轮上限内修正，未通过解析时不调用工具。
+
+执行器还支持 `resume(request, model, RunState, tools, output)`。工具返回 `InputRequired` 时输出 `Delta::Waiting { state, input }` 并结束当前调用。宿主负责加密持久化、授权及收集答案；`state.answer(value)` 将用户输入作为原工具结果注入，`input.retry` 为真时保留当前工具供重新校验。恢复继续剩余调用与轮数，不能从头重放整个 turn。参见 `src/input_tests.rs` 和 `../docs/device-orchestration.md`。

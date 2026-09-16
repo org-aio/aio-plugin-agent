@@ -13,3 +13,10 @@ pub mod service_impl;
 mod store;
 pub mod util;
 mod worker;
+
+mod device_routing;
+mod input_tool;
+mod user_input;
+
+#[cfg(test)]
+mod input_tests;

@@ -49,6 +49,8 @@ async fn fixture(
         assistant: Uuid::new_v4(),
         endpoint,
         wait,
+        selected: None,
+        prompt: String::new(),
     });
     (broker, state, task)
 }
@@ -67,7 +69,7 @@ async fn injects_owner_and_polls_until_process_is_confirmed() {
     let result = tool.invoke(arguments()).await.unwrap();
     assert_eq!(result["state"], "complete");
     assert_eq!(result["result"]["pid"], 49802);
-    assert_eq!(state.requests.lock().unwrap().len(), 3);
+    assert_eq!(state.requests.lock().unwrap().len(), 4);
     server.abort();
 }
 
@@ -97,7 +99,7 @@ async fn queued_is_not_success_and_retries_reuse_request_id() {
         assert!(result.get("result").is_none());
     }
     let requests = state.requests.lock().unwrap();
-    assert_eq!(requests[0]["requestId"], requests[1]["requestId"]);
+    assert_eq!(requests[1]["requestId"], requests[3]["requestId"]);
     server.abort();
 }
 

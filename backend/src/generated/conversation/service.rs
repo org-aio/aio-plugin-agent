@@ -30,6 +30,19 @@ pub trait AgentService: super::super::skills::service::SkillService + Send + Syn
     async fn delete(&self, scope: &Scope, id: Uuid) -> ServiceResult<()>;
     async fn send(&self, scope: &Scope, id: Uuid, prompt: Prompt) -> ServiceResult<Thread>;
     async fn cancel(&self, scope: &Scope, id: Uuid) -> ServiceResult<Thread>;
+    async fn answer_input(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        answer: InputAnswer,
+    ) -> ServiceResult<Thread>;
+    async fn devices(&self, scope: &Scope) -> ServiceResult<serde_json::Value>;
+    async fn select_device(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        selection: DeviceSelection,
+    ) -> ServiceResult<Conversation>;
     async fn shutdown(&self);
     async fn memory_request(
         &self,

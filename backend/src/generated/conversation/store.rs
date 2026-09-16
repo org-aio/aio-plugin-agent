@@ -13,6 +13,7 @@ pub fn provider(row: PgRow) -> Provider {
 }
 pub fn conversation(row: PgRow) -> Conversation {
     Conversation {
+        worker_id: row.get("worker_id"),
         model: row.get("model"),
         id: row.get("id"),
         title: row.get("title"),
@@ -22,7 +23,7 @@ pub fn conversation(row: PgRow) -> Conversation {
     }
 }
 pub const CONVERSATION_COLUMNS: &str =
-    "id, title, provider_id, model, space_id, updated_at::text AS updated_at";
+    "id, title, provider_id, model, space_id, worker_id, updated_at::text AS updated_at";
 
 // 调用方持有任务锁且确认没有活跃任务，避免把正常生成误判为中断。
 pub async fn recover(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
@@ -66,6 +67,7 @@ pub async fn thread(pool: &PgPool, scope: &Scope, id: Uuid) -> ServiceResult<Thr
     let rows = sqlx::query("SELECT id, role, content, status, error, tokens,source_id,memory_status,citations,route,matched_node_ids,activated_node_ids FROM agent_messages WHERE conversation_id=$1 ORDER BY sequence LIMIT 400")
         .bind(id).fetch_all(pool).await?;
     Ok(Thread {
+        pending_input: None,
         conversation,
         messages: rows
             .into_iter()

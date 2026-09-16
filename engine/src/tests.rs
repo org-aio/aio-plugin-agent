@@ -57,6 +57,7 @@ async fn tool_roundtrip_streams_unicode_and_accumulates_usage() -> Result<()> {
         match delta {
             Delta::Text(value) => text.push_str(&value),
             Delta::Tokens(value) => tokens = value,
+            Delta::Waiting { .. } => panic!("此测试不应等待用户"),
         }
     }
     assert_eq!(text, "你好");

@@ -280,6 +280,7 @@ impl AgentService for AgentServiceImpl {
         if let Some(token) = self.core.jobs.lock().await.get(&id) {
             token.cancel();
         }
+        super::user_input::cancel(&self.core, id).await?;
         self.thread(scope, id).await
     }
     async fn memory_request(
@@ -335,6 +336,25 @@ impl AgentService for AgentServiceImpl {
             sqlx::query("INSERT INTO agent_model_grants(provider_id,space_id) VALUES($1,$2) ON CONFLICT DO NOTHING").bind(provider).bind(space).execute(&self.core.pool).await?;
         }
         Ok(result)
+    }
+    async fn answer_input(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        answer: InputAnswer,
+    ) -> ServiceResult<Thread> {
+        super::user_input::answer(self.core.clone(), scope, id, answer).await
+    }
+    async fn devices(&self, scope: &Scope) -> ServiceResult<serde_json::Value> {
+        super::user_input::devices(&self.core, scope).await
+    }
+    async fn select_device(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        selection: DeviceSelection,
+    ) -> ServiceResult<Conversation> {
+        super::user_input::select_device(&self.core, scope, id, selection).await
     }
     async fn shutdown(&self) {
         self.core.shutdown.cancel();

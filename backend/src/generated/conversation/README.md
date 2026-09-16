@@ -13,3 +13,5 @@ Agent 数据库只保存本插件的数据。租约、空间角色、秘密授�
 前台生成和后台整理共用 runtime 执行桥。memory_tools 仅为当前会话绑定空间提供净化检索，Rust 工具循环触发工具调用后重新鉴权，并把返回的来源、命中与邻域合并到当前回复。后台整理不启用工具。
 
 Memory 的 `greeting` 路由与保存、检索一样直接回复，记为 0 tokens；生成提示仅要求在实际使用记忆事实时引用，避免把问候回答变成记忆链接。
+
+用户输入中断见 `user_input.rs`（加密检查点与恢复）、`input_tool.rs`（1 至 3 题）、`device_routing.rs`（用户确定目标）、`generation.rs`（暂停状态收集）。入口为 `/devices`、`PUT /conversations/{id}/device`、`POST /conversations/{id}/input`。完整行为与现有限制见 `../../../../../docs/device-orchestration.md`。

@@ -54,6 +54,12 @@ pub async fn receive(
     util::text(&prompt.content, 16000, "消息")?;
     let content = &prompt.content;
     store::owned(&core.pool, scope, conversation).await?;
+    if super::user_input::pending(&core, scope, conversation)
+        .await?
+        .is_some()
+    {
+        return Err(super::model::conflict("请先回答或取消当前问题"));
+    }
     let mut tx = core.pool.begin().await?;
     sqlx::query("SELECT id FROM agent_conversations WHERE id=$1 FOR UPDATE")
         .bind(conversation)
@@ -157,6 +163,7 @@ async fn receipt(core: &Core, scope: &Scope, id: Uuid, request: Uuid) -> Service
         })
         .collect();
     Ok(Thread {
+        pending_input: None,
         conversation,
         messages,
     })

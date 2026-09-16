@@ -133,6 +133,14 @@ pub async fn send(mut state: Signal<AgentState>) -> Result<(), String> {
     let Some(id) = state.peek().thread.as_ref().map(|t| t.conversation.id) else {
         return Ok(());
     };
+    if state
+        .peek()
+        .thread
+        .as_ref()
+        .is_some_and(|t| t.pending_input.is_some())
+    {
+        return Err("请先回答或取消当前问题".into());
+    }
     let content = state.peek().draft.clone();
     if content.trim().is_empty() {
         return Ok(());
@@ -163,6 +171,7 @@ pub async fn send(mut state: Signal<AgentState>) -> Result<(), String> {
     previous.retain(|old| !receipt.messages.iter().any(|m| m.id == old.id));
     previous.extend(receipt.messages);
     state.write().thread = Some(Thread {
+        pending_input: receipt.pending_input,
         messages: previous,
         conversation: receipt.conversation,
     });

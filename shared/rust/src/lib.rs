@@ -1,7 +1,9 @@
 mod skills;
+mod user_input;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 pub use skills::*;
+pub use user_input::*;
 use uuid::Uuid;
 mod graph;
 mod search;
@@ -46,6 +48,7 @@ pub struct ModelSelection {
 #[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Conversation {
+    pub worker_id: Option<Uuid>,
     pub model: Option<String>,
     pub id: Uuid,
     pub title: String,
@@ -81,6 +84,7 @@ pub struct MemoryCitation {
 #[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Thread {
+    pub pending_input: Option<UserInputRequest>,
     pub conversation: Conversation,
     pub messages: Vec<Message>,
 }

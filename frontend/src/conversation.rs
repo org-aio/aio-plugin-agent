@@ -123,6 +123,7 @@ pub fn ConversationPage() -> Element {
                         "{thread.as_ref().map(|t|t.conversation.title.as_str()).unwrap_or(\"新对话\")}"
                     }
                     crate::models::ConversationModel {}
+                    crate::user_input::ConversationDevice {}
                 }
                 if let Some(error) = view.error.clone() {
                     p { class: "dx-conversation__error", role: "alert", "{error}" }
@@ -160,6 +161,7 @@ pub fn ConversationPage() -> Element {
                                 }
                             }
                         }
+                        if let Some(request) = thread.pending_input { crate::user_input::InputCard { key:"{request.id}", request } }
                         for message in thread.messages {
                             MessageView { key: "{message.id}", message }
                         }
@@ -176,7 +178,7 @@ pub fn ConversationPage() -> Element {
                         placeholder: "发送消息…",
                         rows: "3",
                         value: view.draft.clone(),
-                        disabled: view.busy || view.running(),
+                        disabled: view.busy || view.running() || view.thread.as_ref().is_some_and(|t| t.pending_input.is_some()),
                         oninput: move |e: FormEvent| state.write().draft = e.value(),
                         onkeydown: move |e: KeyboardEvent| {
                             if e.key() == Key::Enter && !e.modifiers().shift() {
@@ -189,7 +191,9 @@ pub fn ConversationPage() -> Element {
                     }
                     div { class: "dx-conversation__composer-actions",
                         small {
-                            if view.running() {
+                            if view.thread.as_ref().is_some_and(|t|t.pending_input.is_some()) {
+                                "等待回答后继续"
+                            } else if view.running() {
                                 "正在回复"
                             } else {
                                 "Enter 发送 · Shift+Enter 换行"
@@ -198,7 +202,7 @@ pub fn ConversationPage() -> Element {
                         Button {
                             r#type: "button",
                             variant: if view.running() { ButtonVariant::Outline } else { ButtonVariant::Primary },
-                            disabled: view.busy || (! view.running() && view
+                            disabled: view.busy || view.thread.as_ref().is_some_and(|t|t.pending_input.is_some()) || (! view.running() && view
                                     .draft.trim().is_empty()),
                             onclick: move |_| {
                                 if state.peek().running() {
@@ -323,6 +327,7 @@ fn MessageView(message: Message) -> Element {
 fn status(message: &Message) -> &str {
     match message.status.as_str() {
         "generating" => "回复中",
+        "awaiting_input" => "等待回答",
         "queued" => "整理中",
         "cancelled" => "已停止",
         "failed" => "失败",

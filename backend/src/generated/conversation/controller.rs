@@ -118,3 +118,26 @@ pub async fn save_search(
 ) -> ServiceResult<Json<SearchSettings>> {
     Ok(Json(service.save_search(&scope, draft).await?))
 }
+
+pub async fn answer_input(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path(id): Path<Uuid>,
+    Json(answer): Json<InputAnswer>,
+) -> ServiceResult<Json<Thread>> {
+    Ok(Json(service.answer_input(&scope, id, answer).await?))
+}
+pub async fn devices(
+    State(service): Service,
+    Extension(scope): Identity,
+) -> ServiceResult<Json<serde_json::Value>> {
+    Ok(Json(service.devices(&scope).await?))
+}
+pub async fn select_device(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path(id): Path<Uuid>,
+    Json(selection): Json<DeviceSelection>,
+) -> ServiceResult<Json<Conversation>> {
+    Ok(Json(service.select_device(&scope, id, selection).await?))
+}

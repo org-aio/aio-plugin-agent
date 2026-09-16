@@ -85,6 +85,12 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
             "/conversations/{id}",
             get(controller::thread).delete(controller::delete),
         )
+        .route("/devices", get(controller::devices))
+        .route(
+            "/conversations/{id}/device",
+            axum::routing::put(controller::select_device),
+        )
+        .route("/conversations/{id}/input", post(controller::answer_input))
         .route("/conversations/{id}/messages", post(controller::send))
         .route(
             "/conversations/{id}/model",
