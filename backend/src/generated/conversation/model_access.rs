@@ -8,12 +8,17 @@ pub async fn conversation(
     core: &Core,
     scope: &Scope,
     provider: Option<Uuid>,
+    model: Option<&str>,
     space: &str,
 ) -> Result<Option<ModelConnection>> {
     if let Some(id) = provider {
         let row = sqlx::query("SELECT id,endpoint,model,secret,user_id FROM agent_providers WHERE id=$1 AND tenant_id=$2 AND user_id=$3")
             .bind(id).bind(&scope.tenant).bind(&scope.user).fetch_one(&core.pool).await?;
-        return decode(core, scope, row).map(Some);
+        let mut connection = decode(core, scope, row)?;
+        if let Some(model) = model {
+            connection.model = model.into();
+        }
+        return Ok(Some(connection));
     }
     let spaces = memory::invoke(core, scope, "GET", "/spaces", Value::Null, false).await?;
     let binding = spaces

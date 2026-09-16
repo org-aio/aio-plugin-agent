@@ -43,7 +43,7 @@ async fn run(weak: Weak<Core>, background: bool) {
 }
 
 async fn deliver(core: &Arc<Core>) -> Result<()> {
-    let rows = sqlx::query("SELECT i.message_id,i.conversation_id,i.request_id,i.ciphertext,i.state,c.tenant_id,c.user_id,c.space_id,c.provider_id,m.content,m.source_id,m.memory_status FROM agent_intake i JOIN agent_conversations c ON c.id=i.conversation_id JOIN agent_messages m ON m.id=i.message_id WHERE i.state IN ('pending','captured') AND i.available_at<=now() ORDER BY m.sequence LIMIT 8").fetch_all(&core.pool).await?;
+    let rows = sqlx::query("SELECT i.message_id,i.conversation_id,i.request_id,i.ciphertext,i.state,c.tenant_id,c.user_id,c.space_id,c.provider_id,c.model,m.content,m.source_id,m.memory_status FROM agent_intake i JOIN agent_conversations c ON c.id=i.conversation_id JOIN agent_messages m ON m.id=i.message_id WHERE i.state IN ('pending','captured') AND i.available_at<=now() ORDER BY m.sequence LIMIT 8").fetch_all(&core.pool).await?;
     for row in rows {
         let message: Uuid = row.get("message_id");
         if deliver_message(core, row).await.is_err() {
@@ -127,6 +127,7 @@ async fn deliver_message(core: &Arc<Core>, row: sqlx::postgres::PgRow) -> Result
             core,
             &scope,
             row.get("provider_id"),
+            row.get::<Option<String>, _>("model").as_deref(),
             space.as_deref().context("记忆空间尚未绑定")?,
         )
         .await?
@@ -298,14 +299,13 @@ async fn compile(core: &Arc<Core>, scope: &Scope, task: &Value) -> Result<Value>
     ];
     let (sender, mut receiver) = mpsc::channel(32);
     let upstream = runtime::generate(
-        &core.config.engine,
         &core.client,
         core.config.gateway.as_ref(),
         &connection.endpoint,
         &connection.model,
         connection.secret.as_deref(),
         messages,
-        None,
+        Vec::new(),
         sender,
     );
     let collect = async {

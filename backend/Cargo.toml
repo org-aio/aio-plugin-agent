@@ -5,8 +5,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
+az-agent-engine = { path = "../engine" }
 az-agent-model = { path = "../shared/rust" }
-az-plugin-contract = { git = "https://github.com/zjarlin/aio-platform.git", rev = "5234b354370554504d6503279d3e45af061e04a1" }
+az-plugin-contract = { git = "https://github.com/zjarlin/aio-platform.git", rev = "6f0ca1d4bcf77935d004292030bd64113bdd1eec" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true

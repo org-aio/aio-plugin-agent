@@ -18,9 +18,11 @@ pub(super) struct MemoryTools {
 }
 
 #[async_trait::async_trait]
-impl crate::runtime::ToolHandler for MemoryTools {
-    async fn invoke(&self, name: &str, arguments: Value) -> Result<Value> {
-        ensure!(name == "memory_search", "工具未授权");
+impl crate::runtime::Tool for MemoryTools {
+    fn definition(&self) -> Value {
+        json!({"type":"function","function":{"name":"memory_search","description":"检索当前空间的相关记忆；闲聊无需检索。","parameters":{"type":"object","properties":{"query":{"type":"string","maxLength":180}},"required":["query"],"additionalProperties":false}}})
+    }
+    async fn invoke(&self, arguments: Value) -> Result<Value> {
         let search: MemorySearch = serde_json::from_value(arguments)?;
         ensure!(
             !search.query.trim().is_empty() && search.query.chars().count() <= 180,

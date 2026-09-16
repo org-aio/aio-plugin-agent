@@ -110,3 +110,11 @@ pub async fn memory_request(
         Json(result),
     ))
 }
+
+pub async fn save_search(
+    State(service): Service,
+    Extension(scope): Identity,
+    Json(draft): Json<SearchSettingsDraft>,
+) -> ServiceResult<Json<SearchSettings>> {
+    Ok(Json(service.save_search(&scope, draft).await?))
+}

@@ -49,13 +49,16 @@ for (let attempt = 0; ; attempt++) {
   } catch {}
   await new Promise((resolve) => setTimeout(resolve, 100));
 }
-const shell = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>智能体 · AIO</title><body style="margin:0;overflow:hidden"><iframe id="plugin" title="智能体" src="/assets/index.html" sandbox="allow-scripts" style="display:block;width:100vw;height:100vh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';const dispose=mountBridge(document.getElementById('plugin'),async request=>{const response=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json','x-aio-ticket':'${ticket}'},body:JSON.stringify({...request,body:Array.from(request.body)})});if(!response.ok)throw new Error(await response.text());return response.json()},{clipboard:true});addEventListener('pagehide',dispose,{once:true});</script></body></html>`;
+const shell = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>智能体 · AIO</title><body style="margin:0;overflow:hidden"><iframe id="plugin" title="智能体" src="/assets/index.html" sandbox="allow-scripts allow-forms" style="display:block;width:100vw;height:100vh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';const dispose=mountBridge(document.getElementById('plugin'),async request=>{const response=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json','x-aio-ticket':'${ticket}'},body:JSON.stringify({...request,body:Array.from(request.body)})});if(!response.ok)throw new Error(await response.text());return response.json()},{clipboard:true});addEventListener('pagehide',dispose,{once:true});</script></body></html>`;
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
   ".mjs": "text/javascript",
   ".wasm": "application/wasm",
   ".otf": "font/otf",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".woff2": "font/woff2",
 };
 const server = createServer(async (req, res) => {
   try {
@@ -86,7 +89,7 @@ const server = createServer(async (req, res) => {
       if (
         !["GET", "POST", "PUT", "DELETE"].includes(input.method) ||
         typeof input.path !== "string" ||
-        !/^\/(settings|providers|conversations|memory)(\/[a-zA-Z0-9/-]+)?$/.test(
+        !/^\/(settings|providers|conversations|memory|tools)(\/[a-zA-Z0-9/-]+)?$/.test(
           input.path,
         ) ||
         !Array.isArray(input.body) ||
@@ -142,7 +145,11 @@ const server = createServer(async (req, res) => {
           "content-type": "text/html; charset=utf-8",
           "cache-control": "no-store",
         })
-        .end(shell);
+        .end(
+          url.searchParams.get("page") === "settings"
+            ? shell.replace("/assets/index.html", "/assets/settings.html")
+            : shell,
+        );
       return;
     }
     if (url.pathname === "/favicon.ico") {
@@ -189,9 +196,17 @@ const server = createServer(async (req, res) => {
         childNodes: [],
         parentNode: head,
       });
+      head.childNodes.unshift({
+        nodeName: "base",
+        tagName: "base",
+        namespaceURI: "http://www.w3.org/1999/xhtml",
+        attrs: [{ name: "href", value: `${origin}/assets/` }],
+        childNodes: [],
+        parentNode: head,
+      });
       bytes = Buffer.from(serialize(doc));
       headers["content-security-policy"] =
-        `sandbox allow-scripts; default-src 'none'; script-src ${origin} 'unsafe-inline' 'wasm-unsafe-eval'; connect-src ${origin}/assets/; img-src ${origin}/assets/ data: blob:; font-src ${origin}/assets/; style-src 'unsafe-inline'; worker-src blob:; base-uri 'none'; form-action 'none'`;
+        `sandbox allow-scripts allow-forms; default-src 'none'; script-src ${origin} 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src ${origin}/assets/; img-src ${origin}/assets/ data: blob:; font-src ${origin}/assets/; style-src 'unsafe-inline' ${origin}/assets/; worker-src blob:; base-uri ${origin}/assets/; form-action 'none'`;
     }
     res.writeHead(200, headers).end(bytes);
   } catch (error) {

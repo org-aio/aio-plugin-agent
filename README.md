@@ -1,80 +1,53 @@
 # 智能体
 
-`aio-plugin-agent`：Pi Agent 运行时 + Rust 持久化与鉴权服务 + 真实 Compose Web 界面 + PostgreSQL。同仓 `frontend/`、`backend/`、`runtime/`、`shared/`，Rust JsonSchema 生成 Kotlin 传输模型，不带 JVM。Pi 使用官方 `@earendil-works/pi-coding-agent` / `pi-ai` 0.85.1，界面不依赖 Pi 的 TUI。
+Dioxus Web + Rust Agent 执行器 + PostgreSQL。`frontend` 管理会话界面，`engine` 提供无界面、无 AIO 依赖的工具循环，`backend` 负责身份、加密、持久化与受控出站，`shared/rust` 共享传输模型。
 
-运行时边界见 [Agent 运行时](runtime/README.md)。复用 Pi AgentSession、模型适配器、流处理和原生扩展工具循环；AIO 保留空间授权、秘密隔离、任务持久化和知识提交，通过无 UI 依赖的 JSON 进程协议连接。
+执行器参考 [rust-ai-agent](https://github.com/solenovex/rust-ai-agent) 的消息—工具—结果循环设计，未复制整个 CLI 或引入进程级配置。模型连接与工具由调用方注入；运行时不依赖 Node、Pi SDK 或 JVM。库的 API、限制和验证见 [engine](engine/README.md)。
 
-命令行与本机笔记见 [中文 CLI 指南](cli/README.md)：安装 `aio-agent`，查询同一空间的记忆，将本地 Markdown/TXT 或指定 iCloud 备忘录账号交给空间绑定的模型整理为 wiki 和图谱，并在核对后按配置清理原文件。
+## 使用
 
-## 子插件规范
+安装后在工作空间打开智能体，在“系统 → 设置 → 插件设置”或市场详情打开配置，也可从对话中的设置进入。
 
-- 父插件：`aio-plugin-agent`。
-- 记忆子插件：[aio-plugin-agent-memory](https://github.com/zjarlin/aio-plugin-agent-memory)。
-- 后续子插件一律 `aio-plugin-agent-<功能名>`，如 `aio-plugin-agent-tools`；不再使用独立顶级 `aio-plugin-<子功能>` 名称。
-- 子插件 Kotlin 包为 `site.addzero.aio.agent.<功能名>`；Rust 包名保留 `az-` 前缀。仓库名表示来源和归属，不是 Dill 运行时类型身份。
-- `family.json` 与检查脚本约束命名和归属。Agent 通过受信宿主桥调用 Memory，不直接访问子插件数据库；正式市场根据父子清单校验独立安装、停用和卸载依赖。
+- 只填写模型服务 URL 和 API Key，名称自动生成；从兼容服务的 `/v1/models` 读取模型，支持同一个服务下的多个模型。
+- 对话顶部可切换服务和模型，保留已有历史并从下一轮生效。排队和生成时暂不可切换，也可选择跟随空间模型。
+- 网页搜索在插件设置中填写 Tavily API Key 并启用。密钥按当前租户和用户加密保存，界面只显示是否配置；留空保留，清除时禁用。工具调用使用 [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)。
+- 个人/团队记忆、来源引用、秘密查看和授权、待核实修订、会话搜索、知识图谱、停止生成、确认删除均在 Dioxus 界面完成。窄屏的历史和图谱可单独展开。
+- 只有后端授权引用能打开记忆条目，模型伪造的引用不可点击；工具检索与来源访问仍校验当前空间权限。
 
-## 当前能力
+## 数据与执行边界
 
-- 模型配置、会话创建、历史查看、消息生成、停止生成、确认删除。
-- 服务地址可手动输入 API 基址（如 `https://api.example.com/v1`），模型列表读取该地址的 `GET /models`。地址仍须由宿主授权；已安装的 process 插件需要宿主支持 `/egress/models`。会话标题下可切换已配置模型或跟随空间模型，保留历史并从下一轮生效，排队或生成期间暂不可切换。
-- 请求 OpenAI-compatible `/chat/completions`，Pi 解析真实 SSE，Rust 仅转发授权出站；正在生成时前端每 350ms 获取持久化快照，结束后停止轮询。现有桥不支持推送流，不宣称浏览器已直连 SSE。
-- 输入、会话搜索、弹窗草稿是 Compose 本地状态。输入不会发送模型请求。
-- 发送先在 PostgreSQL 事务中写入加密收件箱、请求指纹和“已收下”回复，随后由后台隔离秘密、检索资料并生成回复。普通消息表、历史上下文和引用仅使用净化内容。重复请求 UUID 不重复收件，不同内容复用同一 UUID 会被拒绝。
-- Memory 管理空间、来源、秘密和整理租约；Agent 的独立后台任务执行模型请求并提交 wiki 修订。前台问答可抢占后台整理，暂停不消耗失败重试次数。每个空间需要显式绑定整理模型，未配置时继续收件。
-- 会话未单独选择模型时，后续问答自动使用空间已授权的模型。先收件、后配置也能继续原对话，团队成员无需获取模型密钥。
-- 个人与团队空间、成员角色、秘密单独授权、来源引用、待核实修订及受控秘密展示。空间管理员不会自动获得秘密和原文权限。来源删除或撤权后，历史中依赖该来源的内容不再显示，也不进入后续模型请求。
-- 部分输出每 250ms 落库，进程异常退出后标记中断。净化及整理任务由持久状态恢复，保留原文和已提交知识；未完成的模型回复可继续对话。
-- 模型凭据以 AES-256-GCM 加密，绑定租户、用户和配置 ID；前端只能看到是否已保存密钥。地址改变后不会沿用旧密钥。
-- 服务仅能请求宿主允许的完整 API 基址，不跟随重定向，不读取代理环境变量。最多 4 个并发生成，120 秒总超时，输入和输出有界。
-- 支持基于标题、别名、正文与图谱邻域的记忆检索，不依赖向量服务。Pi 可通过原生 `memory_search` 工具补充检索，结果重新校验当前空间权限，并写回来源引用和本轮图谱激活；初版不开放 Shell、文件读写或凭据调用外部服务。
-- 聊天默认同时显示知识图谱：桌面并排、窄屏上下排列，可收起、缩放、暂停和切换节点列表。当前轮次命中与邻域高亮，历史轮次可重新选中；激活 ID 持久化且与累积引用分开。
-- Memory 的纯 Kotlin 分类规则优先处理明确保存、查找和凭据定位。查找返回净化摘录和来源，不调用模型，也不生成 wiki 任务；明确保存仅后台整理可能使用模型。分析、复合和不确定请求回退模型，检索上下文上限为 6000 字符。回复中的 0 tokens 仅表示该次前台回复未调用模型。
+会话和消息沿用现有 PostgreSQL 表。发送先保存加密收件与幂等 UUID，Memory 隔离秘密后再整理和生成。来源删除或撤权后，依赖内容不会显示或进入后续上下文。后台整理可恢复并由前台抢占；正在生成的回复每 250ms 持久化，浏览器每 650ms 读取快照，结束后停止轮询。
 
-接口参照 [Chat Completions 官方契约](https://developers.openai.com/api/reference/resources/chat)。自定义兼容服务须支持分段消息、`stream`、有效的 `finish_reason` 与 SSE `data: [DONE]`；模型 ID 由用户配置，没有写死默认模型。Pi SDK 参照 [官方 SDK 文档](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md)。
+Rust 引擎直接处理兼容 `/chat/completions` SSE，要求有效结束标记；支持最多 8 轮工具调用、4 个前台并发和 120 秒总超时。工具包括授权的 `memory_search` 和可选 `web_search`，不开放 Shell 或本地文件执行。网页与记忆结果均作为不可信资料。模型凭据与工具密钥不写入日志、前端资产或 Git。
 
-## 本地运行
+父插件 `aio-plugin-agent` 与记忆子插件 [aio-plugin-agent-memory](https://github.com/zjarlin/aio-plugin-agent-memory) 独立发布，以宿主桥调用而不共享数据库。后续子插件采用 `aio-plugin-agent-<功能名>` 命名。命令行笔记采集见 [CLI 指南](cli/README.md)。
 
-依赖：Node.js 22.19+、固定 Rust nightly 2026-05-25（Dill 要求）、Kotlin wrapper 0.12.0-dev-4233、独立开发 PostgreSQL。前端编译器 2.4.10 / Compose 1.12.0-beta03，资源包含本地中文字体，不用公网 CDN。
+## 开发与验证
+
+依赖 Rust nightly-2026-05-25、Dioxus CLI 0.7.9、Node 22+ 作者工具与独立 PostgreSQL；生产 Agent 仅运行 Rust ELF。Linux 交叉编译另需 cargo-zigbuild 和 Zig。
 
 ```sh
 npm ci --ignore-scripts
-AIO_GRAPH_SOURCE=../../kmp-aio/lib/compose/az-compose npm run build
-cargo build --locked -p az-agent-server
-export AIO_TEST_DATABASE_URL='postgres://developer@127.0.0.1:55432/agent_dev'
+npm run build
+cargo build -p az-agent-server
+export AIO_TEST_DATABASE_URL='postgres://developer@127.0.0.1:5432/agent_test'
 node scripts/setup-dev.mjs
-npm run preview
+node scripts/preview-memory.mjs
 ```
 
-默认预览 `http://127.0.0.1:4192/`，Rust 后端监听 loopback 4193。运行完整记忆链路使用 `node scripts/preview-memory.mjs`，要求相邻 Memory 仓库已构建 frontend、backend 和 release 开发运行器。开发身份固定为 `preview/developer`，不是公网登录实现。预览票据只在父页面，iframe 无法读取 Cookie 和父 DOM，宿主丢弃前端传入的租户/用户请求头。
-
-`setup-dev.mjs` 创建独立 schema 和最小权限数据角色，在忽略提交的 `.local/runtime.json` 中以 0600 保存主密钥及连接配置；重复执行按校验和应用新迁移并保留原配置。备份此文件和数据库，丢失主密钥将无法解密模型凭据。默认仅允许 `https://api.openai.com/v1`。配置模型并将其绑定到空间后，已有待整理资料会自动进入后台模型队列。
-
-其他服务由管理员配置 `allowedEndpoints`；本地兼容服务还需 `allowLoopback: true`。密钥不能写进 Git、前端资源或日志。生产应由宿主秘密管理器注入，而不是复制开发配置。
-
-## 验证
-
-图谱与 Memory 锁定同一个 az-compose 提交。上游是私有仓库，可通过 `AIO_GRAPH_SOURCE` 指定有读取权限的本地 Git 仓库，省略时构建会按锁定提交拉取。
+完整记忆联调需相邻 Memory 仓库已构建 Component 和 release 开发运行器。测试库需撤销 public schema 的 PUBLIC 权限，详见该仓库开发宿主说明。开发配置保存在忽略提交的 `.local/runtime.json`（0600），重复初始化保留密钥并按校验和迁移。默认本地预览为 4192，设置页为 `/?page=settings`。
 
 ```sh
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-npm run test:runtime
-node scripts/check-family.mjs ../aio-plugin-agent-memory
 node scripts/test-service.mjs
 npm run test:browser
 ```
 
-服务测试启动真实 Kotlin Memory Component、Agent process、独立 PostgreSQL schema 和可检查请求的 SSE 测试端点；覆盖秘密不泄露、租约回收、退避与失败重试、强制退出恢复、跨空间拒绝、独立授权、补充说明、wiki/别名/关系、人工冲突和回退。浏览器另起 4298/4299，验证桌面与移动端真实 Compose 对话和秘密查看/复制。`AIO_MEMORY_TEST_DIRECTORY` 可选择新的验收数据目录。**未配置真实模型凭据，协议测试不代表真实 LLM 提取质量验收。**
-
-本地数据库副本演练运行 `node scripts/rehearse-memory.mjs`；只接受本机 PostgreSQL，在新数据库恢复备份和测试密钥，验证 Agent 数据角色、模型凭据、Memory 秘密可解密以及后台身份无法查看秘密。用 `AIO_MEMORY_TEST_DIRECTORY` 指向此前服务测试的目录；报告保存在忽略提交的 `build/`。这不是生产数据库演练。
-
-## 公网状态
-
-提供 v2 process 清单和正式宿主入口，Compose 通过 AIO 的 v2 沙箱桥调用服务。容器无网络，数据库、Memory 和模型调用经过宿主私有 Unix 通道；Pi 不读取挂载中的密钥。上线前需通过宿主数据库副本、父子安装和浏览器验收，发布状态以宿主交付记录为准。构建与授权见 [部署边界](deployment/README.md)。
+服务回归使用真实数据库、Memory Component 和模拟 SSE 模型，覆盖工具、密钥隔离、租约/重试、停止/重启、撤权及修订。浏览器覆盖 1440×900 与 390×844。工具协议测试不代替真实 LLM 提取质量或付费 Tavily 联网验收。
 
 ## 自动交付
 
-默认分支推送后，平台通过 `aio-delivery.toml` 发现完整 Git SHA，在固定摘要的 Fullstack 镜像中构建 Compose 前端与 Rust 服务，再校验 v2 包、发布市场并升级仍启用该插件的租户。构建失败保留活动版本，停用和卸载不会被自动恢复；手动回滚会跳过当前发布版本，后续新版本才继续跟进。
+默认分支推送后，平台按 `aio-delivery.toml` 在固定摘要的 Rust 构建镜像中生成 Dioxus 资产与 glibc 2.17 服务，发布 v2 包并更新仍启用该插件的租户。失败保留活动版本；停用、卸载不会被恢复。
 
-正式交付使用 `scripts/build.sh --process`，生成 glibc 2.17 的 Linux 服务；本地开发继续使用 `scripts/build.sh`。源码、依赖版本和产物摘要随交付任务保存；发布凭据仅在服务器交付进程中，构建容器不接收发布凭据。平台和工作进程须支持 v2 自动交付及 `AIO_BUILD_IMAGE_FULLSTACK`。
+插件清单声明 `settings_page` 与第三方 `http_endpoints`，要求宿主至少 2026.9.18。容器禁网，数据库、Memory、模型和第三方请求经 Unix broker；完整授权与镜像说明见 [部署边界](deployment/README.md)。上线以交付记录和实际挂载版本为准。

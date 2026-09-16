@@ -291,6 +291,8 @@ const pool = new pg.Pool({ connectionString: config.databaseUrl });
 async function verify() {
   await startMemory();
   await startAgent();
+  const { verifySettings } = await import("./settings-tests.mjs");
+  await verifySettings({ agent, pool });
   const provider = await agent("POST", "/providers", {
     label: "memory-test",
     model: "memory-test",

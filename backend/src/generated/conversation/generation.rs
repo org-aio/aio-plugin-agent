@@ -1,5 +1,5 @@
 use super::{model::*, service_impl::Core, store, util};
-use crate::runtime::{self, Delta, ToolHandler};
+use crate::runtime::{self, Delta, Tool};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::{OwnedSemaphorePermit, mpsc};
@@ -68,6 +68,7 @@ pub async fn respond(
             }
         }
     }
+    let search_tool = crate::generated::web_search::tool(&core, scope).await?;
     let mut jobs = core.jobs.lock().await;
     if core.shutdown.is_cancelled() {
         return Err(conflict("服务正在停止"));
@@ -114,15 +115,19 @@ pub async fn respond(
     tx.commit().await?;
     let cancel = core.shutdown.child_token();
     jobs.insert(id, cancel.clone());
-    let tools = safe.conversation.space_id.map(|space| {
-        Arc::new(super::memory_tools::MemoryTools {
+    let mut tools: Vec<Arc<dyn Tool>> = Vec::new();
+    if let Some(space) = safe.conversation.space_id {
+        tools.push(Arc::new(super::memory_tools::MemoryTools {
             core: core.clone(),
             scope: scope.clone(),
             space,
             assistant,
             source,
-        }) as Arc<dyn ToolHandler>
-    });
+        }) as Arc<dyn Tool>);
+    }
+    if let Some(search) = search_tool {
+        tools.push(search);
+    }
     let task_core = core.clone();
     tokio::spawn(async move {
         run(
@@ -153,20 +158,18 @@ async fn run(
     model: String,
     secret: Option<String>,
     messages: Vec<serde_json::Value>,
-    tools: Option<Arc<dyn ToolHandler>>,
+    tools: Vec<Arc<dyn Tool>>,
     cancel: CancellationToken,
     _permit: OwnedSemaphorePermit,
 ) {
     let (sender, mut receiver) = mpsc::channel(32);
     let client = core.client.clone();
     let timeout = core.config.generation_timeout;
-    let engine = core.config.engine.clone();
     let gateway = core.config.gateway.clone();
     let upstream = tokio::spawn(async move {
         tokio::time::timeout(
             timeout,
             runtime::generate(
-                &engine,
                 &client,
                 gateway.as_ref(),
                 &endpoint,

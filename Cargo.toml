@@ -1,5 +1,5 @@
 [workspace]
-members = ["backend", "shared/rust"]
+members = ["backend", "shared/rust", "engine", "frontend"]
 resolver = "2"
 
 [workspace.dependencies]

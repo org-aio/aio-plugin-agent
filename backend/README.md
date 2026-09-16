@@ -1,4 +1,5 @@
-# Rust Agent 服务
+# 智能体服务
 
-常驻 Rust process 负责鉴权、加密、取消、并发限制和会话持久化，无 JVM。模型协议与 Agent 工具循环委托 Pi SDK 子进程，runtime 模块只做 JSON 进程通信、授权出站和工具回调。前端轮询正在生成的会话快照，停止生成后不轮询。
-公开宿主尚未开放 process 的受限出站、数据库和密钥绑定，因此当前只能在配置好的开发宿主中运行，不能放宽旧监督器规则绕过安装门禁。
+常驻 Rust process 负责 AIO 鉴权、加密、取消、并发配额和 PostgreSQL 持久化。模型协议与工具循环调用无界面 engine 库，不启动 Node/JVM 子进程。
+
+conversation 管理会话、记忆授权与后台整理；web_search 管理用户独立的加密搜索配置与 Tavily 工具。前端仅获得 hasSecret，主密钥由宿主派生；生产进程无网络，模型/第三方 HTTP/跨插件调用均经 Unix broker。

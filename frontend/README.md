@@ -1,3 +1,7 @@
-# Compose Agent 工作台
+# 智能体界面
 
-真实 ComposeViewport 绘制。输入、搜索、选项、展开与编辑草稿是本地状态；只有持久化和正在运行的生成任务会调用后端。
+Dioxus Web 前端，依赖共享 az-ui-components 的布局、主题、表单、Markdown 与 Dialog；业务不定义 CSS。通过 AIO Web SDK 获取已认证的数据，不接触服务密钥。
+
+主入口 index.html 为会话工作空间；同一构建的 settings.html 标记为独立设置页，由宿主插件设置 Dialog 挂载。对话、模型选择、记忆来源/权限、图谱各自独立，传输模型来自 shared/rust。
+
+构建：在仓库根运行 `dx build --package az-agent-frontend --platform web --release`，再运行 `node scripts/package-frontend.mjs`。完整浏览器验证见 scripts/README.md。

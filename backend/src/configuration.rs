@@ -5,7 +5,6 @@ use url::Url;
 
 #[derive(Clone)]
 pub struct RuntimeConfig {
-    pub engine: crate::runtime::EngineConfig,
     pub gateway: Option<Gateway>,
     pub database_url: String,
     pub encryption_key: [u8; 32],
@@ -33,7 +32,6 @@ impl RuntimeConfig {
             .decode(std::env::var("AIO_AGENT_MASTER_KEY").context("缺少 AIO_AGENT_MASTER_KEY")?)?;
         let config = Self {
             gateway: None,
-            engine: crate::runtime::EngineConfig::from_env()?,
             database_url: std::env::var("AIO_AGENT_DATABASE_URL")
                 .context("缺少插件专属数据库连接")?,
             encryption_key: key
@@ -114,10 +112,6 @@ mod tests {
     fn private_http_requires_gateway_and_an_exact_host_grant() {
         let endpoint = "http://192.168.31.252:18080/v1";
         let mut config = RuntimeConfig {
-            engine: crate::runtime::EngineConfig {
-                node: "node".into(),
-                directory: "runtime".into(),
-            },
             gateway: None,
             database_url: String::new(),
             encryption_key: [0; 32],

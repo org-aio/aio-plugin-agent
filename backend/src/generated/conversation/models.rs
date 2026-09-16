@@ -91,6 +91,14 @@ pub(super) async fn select(
     id: Uuid,
     selection: ModelSelection,
 ) -> ServiceResult<Conversation> {
+    let model = selection
+        .model
+        .as_deref()
+        .map(|value| util::text(value, 160, "模型"))
+        .transpose()?;
+    if selection.provider_id.is_none() && model.is_some() {
+        return Err(bad("请选择模型服务"));
+    }
     let mut tx = core.pool.begin().await?;
     let owned: Option<Uuid> = sqlx::query_scalar(
         "SELECT id FROM agent_conversations WHERE id=$1 AND tenant_id=$2 AND user_id=$3 FOR UPDATE",
@@ -112,11 +120,12 @@ pub(super) async fn select(
         owned.ok_or_else(missing)?;
     }
     let row = sqlx::query(&format!(
-        "UPDATE agent_conversations SET provider_id=$1,updated_at=now() WHERE id=$2 RETURNING {}",
+        "UPDATE agent_conversations SET provider_id=$1,model=$3,updated_at=now() WHERE id=$2 RETURNING {}",
         store::CONVERSATION_COLUMNS
     ))
     .bind(selection.provider_id)
     .bind(id)
+    .bind(model)
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;

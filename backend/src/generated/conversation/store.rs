@@ -13,6 +13,7 @@ pub fn provider(row: PgRow) -> Provider {
 }
 pub fn conversation(row: PgRow) -> Conversation {
     Conversation {
+        model: row.get("model"),
         id: row.get("id"),
         title: row.get("title"),
         provider_id: row.get("provider_id"),
@@ -21,7 +22,7 @@ pub fn conversation(row: PgRow) -> Conversation {
     }
 }
 pub const CONVERSATION_COLUMNS: &str =
-    "id, title, provider_id, space_id, updated_at::text AS updated_at";
+    "id, title, provider_id, model, space_id, updated_at::text AS updated_at";
 
 // 调用方持有任务锁且确认没有活跃任务，避免把正常生成误判为中断。
 pub async fn recover(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {

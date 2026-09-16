@@ -1,3 +1,3 @@
-# Agent 执行桥
+# 执行适配
 
-启动无 UI 的 Pi SDK 进程，传入净化会话，通过 shared 的 JSON 行协议转发模型 HTTP 和授权工具调用。这里不解析模型 SSE、不执行 Agent 推理循环。进程不继承数据库、主密钥或模型密钥；取消、超时和上游错误均结束子进程及出站任务。
+为独立 engine 提供已授权的模型 RequestBuilder 和工具实例。端点、认证和 Unix broker 由 AIO 服务控制；engine 负责流式解码与工具循环。取消通过释放生成 future 同时终止网络请求和工具调用。

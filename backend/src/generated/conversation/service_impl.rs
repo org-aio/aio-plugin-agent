@@ -78,6 +78,13 @@ impl AgentServiceImpl {
 
 #[async_trait]
 impl AgentService for AgentServiceImpl {
+    async fn save_search(
+        &self,
+        scope: &Scope,
+        draft: SearchSettingsDraft,
+    ) -> ServiceResult<SearchSettings> {
+        crate::generated::web_search::save(&self.core, scope, draft).await
+    }
     async fn models(&self, scope: &Scope, request: ModelListRequest) -> ServiceResult<Vec<String>> {
         super::models::list(&self.core, scope, request).await
     }
@@ -97,6 +104,7 @@ impl AgentService for AgentServiceImpl {
             providers,
             max_prompt_chars: 16000,
             memory_available: self.core.config.memory.is_some(),
+            web_search: crate::generated::web_search::read(&self.core, scope).await?,
         })
     }
     async fn save_provider(

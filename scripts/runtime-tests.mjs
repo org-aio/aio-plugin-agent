@@ -20,10 +20,10 @@ export function runtimeModelResponse(input, response, authorization) {
     ["memory_search"],
   );
   const results = input.messages.filter((message) => message.role === "tool");
-  if (results.length) assert(results[0].content.includes("没有找到相关资料"));
+  if (results.length) assert(results[0].content.includes("没有找到相关资料"), JSON.stringify(results[0]));
   const complete = results.length === 2;
   const delta = complete
-    ? { content: "已通过 Pi 工具读取记忆。" }
+    ? { content: "已通过 Rust 工具读取记忆。" }
     : {
         tool_calls: [
           {
@@ -76,13 +76,13 @@ export async function verifyRuntime({
     })
   ).body;
   const provider = await agent("POST", "/providers", {
-    label: "Pi 运行时验收",
+    label: "Rust 运行时验收",
     model: "runtime-tool",
     endpoint,
     secret: "runtime-provider-key",
   });
   const conversation = await agent("POST", "/conversations", {
-    title: "Pi 原生扩展",
+    title: "Rust 工具循环",
     providerId: provider.id,
     spaceId: space.id,
   });
@@ -96,7 +96,7 @@ export async function verifyRuntime({
     (value) => value.messages.at(-1)?.status === "complete",
   );
   const reply = thread.messages.at(-1);
-  assert.equal(reply.content, "已通过 Pi 工具读取记忆。");
+  assert.equal(reply.content, "已通过 Rust 工具读取记忆。");
   assert.equal(reply.tokens, 39);
   assert(
     !reply.citations.some(
@@ -121,6 +121,6 @@ export async function verifyRuntime({
   assert.equal(removed.memoryStatus, "unavailable");
   assert(!removed.activatedNodeIds.includes(note.id));
   console.log(
-    "Pi runtime, native memory tool, controlled credentials and graph activation checks passed",
+    "Rust runtime, native memory tool, controlled credentials and graph activation checks passed",
   );
 }

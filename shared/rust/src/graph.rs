@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryGraph {
     pub nodes: Vec<MemoryNode>,
@@ -10,7 +10,7 @@ pub struct MemoryGraph {
     pub truncated: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryNode {
     pub id: String,
@@ -24,7 +24,7 @@ pub struct MemoryNode {
     pub aliases: Vec<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MemoryEdge {
     pub id: String,
     pub source: String,

@@ -1,0 +1,6 @@
+[application]
+name = "agent"
+default_platform = "web"
+[web.app]
+title = "智能体"
+base_path = "."

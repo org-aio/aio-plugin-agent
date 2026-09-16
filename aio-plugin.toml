@@ -1,18 +1,22 @@
 schema_version = 2
 
+[plugin]
+settings_page = "settings"
+
 [plugin.marketplace]
 title = "智能体"
-summary = "Compose 对话工作台，复用 Pi Agent 运行时，按空间保存与检索记忆并显示知识图谱。"
+summary = "Dioxus 对话工作台与 Rust Agent 执行器，支持动态模型、网页搜索、记忆与知识图谱。"
 license = "MIT"
 tags = ["智能体", "对话", "记忆"]
 
 [plugin.runtime]
 artifact = "dist/agent-server"
-host_version = ">=2026.9.11"
+host_version = ">=2026.9.18"
 
 [plugin.runtime.process]
-image = "sha256:95c1e73abd6aee38be7b4f756747f7d160eba6eb30b92b7868b4b93dfe213a06"
+image = "sha256:48a661b5e5f4560287dfc254e948825538d0f7a1379616495a424ed375afd31f"
 endpoints = ["https://api.openai.com/v1", "https://company-ai.addzero.site/v1", "http://192.168.31.252:18080/v1"]
+http_endpoints = ["https://api.tavily.com/search"]
 services = ["https://github.com/zjarlin/aio-plugin-agent-memory.git"]
 
 [plugin.frontend]

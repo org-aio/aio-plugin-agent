@@ -52,6 +52,6 @@ export async function verifyLocalNotes({ agent, eventually, provider, canary, mo
     assert(answer.content.includes('17:30'));
     assert(answer.activatedNodeIds.some(id => graph.nodes.some(node => node.id === id)));
     assert.equal(modelRequests.length, before, '明确查找不消耗前台模型请求');
-    console.log('CLI 笔记链路通过：真实收件、去重、Pi 整理、wiki 校验、密码隔离、可恢复清理及 AIO 对话召回');
+    console.log('CLI 笔记链路通过：真实收件、去重、Rust 整理、wiki 校验、密码隔离、可恢复清理及 AIO 对话召回');
   } finally { await rm(root, { recursive: true, force: true }); }
 }

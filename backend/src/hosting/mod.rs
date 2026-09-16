@@ -5,7 +5,6 @@ use std::path::PathBuf;
 
 use crate::{
     configuration::{Gateway, MemoryConnection, RuntimeConfig},
-    runtime::EngineConfig,
     transport::Ingress,
 };
 
@@ -37,12 +36,14 @@ pub fn load() -> Result<Option<(RuntimeConfig, Ingress)>> {
         .services
         .iter()
         .any(|git| git == MEMORY_SOURCE)
-        .then(|| MemoryConnection {
-            endpoint: "http://localhost/invoke".parse().expect("静态宿主 URL"),
-            token: host.ingress_token.clone(),
-        });
+        .then(|| -> Result<MemoryConnection> {
+            Ok(MemoryConnection {
+                endpoint: "http://localhost/invoke".parse()?,
+                token: host.ingress_token.clone(),
+            })
+        })
+        .transpose()?;
     let config = RuntimeConfig {
-        engine: EngineConfig::from_env()?,
         gateway: Some(Gateway {
             socket: host.broker_socket.into(),
             token: host.ingress_token.clone(),
@@ -68,6 +69,6 @@ pub fn load() -> Result<Option<(RuntimeConfig, Ingress)>> {
 
 pub async fn describe() -> axum::Json<serde_json::Value> {
     axum::Json(
-        serde_json::json!({"label":"智能体","pages":[{"id":"chat","label":"智能体","entry":"index.html","scene":["workspace","工作空间"],"menu_path":[],"permission":null,"surface":"workspace"}]}),
+        serde_json::json!({"label":"智能体","pages":[{"id":"chat","label":"智能体","entry":"index.html","scene":["workspace","工作空间"],"menu_path":[],"permission":null,"surface":"workspace"},{"id":"settings","label":"智能体设置","entry":"settings.html","scene":null,"menu_path":[],"permission":null,"surface":"fullscreen"}]}),
     )
 }

@@ -1,19 +1,15 @@
 # 部署边界
 
-模型地址校验复用 shared 协议库的 `process::model_endpoint`。正式 broker 允许已声明且获宿主批准的 HTTPS 或固定私网 IP 的 HTTP；例如本部署 Codex 网关 `http://192.168.31.252:18080/v1`，必须同时加入 `AIO_PROCESS_ENDPOINTS`。HTTP 域名、公网、回环和链路本地地址均不能通过正式出站。独立开发服务仍只接受 HTTPS 或显式开启的本机回环。
+`aio-plugin.toml` 声明原生 v2 process、独立设置页和权限。宿主 >=2026.9.18，受控构建使用 `scripts/build.sh --process` 生成 Dioxus 前端、设置入口及 glibc 2.17 Linux ELF。运行时固定 `Containerfile` 的 runtime 镜像摘要；镜像只包含 Rust ELF 所需系统动态库和证书，不包含 Node、Pi、JVM、Shell 或构建工具。
 
-公司接口填写完整基址 `https://company-ai.addzero.site/v1`。`http://company-ai.addzero.site` 的协议和路径均不匹配，不能作为已授权地址使用。新增地址需同时更新插件清单的 `plugin.runtime.process.endpoints` 与宿主 `AIO_PROCESS_ENDPOINTS`，重载宿主配置并发布、激活新插件包；仅修改宿主环境文件不会改变旧插件实例的授权。界面通过 `<基址>/models` 获取模型，通过 `<基址>/chat/completions` 请求回复。
+容器以 UID/GID 65532 运行、只读、禁网，通过 AIO_PLUGIN_CONFIG 读取宿主绑定并在 AIO_PLUGIN_SOCKET 提供服务。宿主独立数据库角色只有本插件 DML 权限，主密钥稳定派生，升级沿用原 schema；卸载不删除数据。激活先停止旧实例，不能宣称无缝并行滚动替换。
 
-AIO 正式接入使用根目录 aio-plugin.toml 的 v2 process 包。宿主需具备固定镜像授权、专属 PostgreSQL 数据角色、持久派生密钥、交互上下文和 Unix broker；旧的零能力 process 入口不能安装本包。
+模型 API 基址需要同时声明在 `plugin.runtime.process.endpoints` 与管理员 `AIO_PROCESS_ENDPOINTS`，不允许重定向。公司服务填写 `https://company-ai.addzero.site/v1`；列表请求 `<基址>/models`，生成请求 `<基址>/chat/completions`。地址改变时不复用旧 Key。
 
-正式宿主按租户启动无网络容器，通过只读挂载传入 AIO_PLUGIN_CONFIG，Agent 在 AIO_PLUGIN_SOCKET 提供服务。数据库只通过专属 Unix 通道连接；模型只能经宿主转发到清单和管理员共同授权的基址。Memory 按来源地址解析到同租户已启用的子插件，交互秘密访问需要仍有效的入站上下文，后台使用 service 身份。
+Tavily 使用 `https://api.tavily.com/search`，同时加入清单 http_endpoints 与宿主 AIO_PROCESS_HTTP_ENDPOINTS。插件用户在设置页填写 Key 后，经 `/egress/http` 执行固定 JSON POST；不能扩展为任意 URL、HTTP 方法或转发头。关闭搜索不会向第三方发请求。
 
-先用 npm run build 生成 Compose 前端，再运行 sh scripts/build-process.sh 构建 Linux x86_64 ELF，要求 cargo-zigbuild、Zig 和 x86_64-unknown-linux-gnu target。Containerfile 的 runtime target 只包含固定版本 Node 和 Pi，不包含宿主密钥；运行时镜像摘要记录在清单中，ELF、前端和迁移由整包摘要绑定。本机默认构建当前架构，不能把 macOS 产物安装到 Linux。
+Memory 根据 Git 来源定位同租户已启用的子插件。后台 service 身份不能查看秘密；交互式揭示需要仍有效的入站上下文。模型与工具仅接触净化消息和已授权资料。
 
-构建产物包括 agent-server、runtime 和生产 node_modules；直接运行产物时设置 AIO_AGENT_RUNTIME_DIR 为 dist/runtime 的绝对路径，使用 Node 22.19+。容器固定 Node 22.23.1 并以非 root 用户启动，在 Linux 层重新安装生产依赖，避免复用开发机平台相关依赖。Node 子进程不继承服务凭据，模型 HTTP 字节通过父进程转发。
+独立本机预览使用 AIO_AGENT_DATABASE_URL、AIO_AGENT_MASTER_KEY、AIO_AGENT_INGRESS_TOKEN、AIO_AGENT_ENDPOINTS 与 Memory 开发桥变量。生产只读取宿主私有配置，不复制开发身份和密钥；不得将连接、Key 或票据写入 Git 和页面。
 
-容器不内置 JVM；外部注入环境：AIO_AGENT_DATABASE_URL、AIO_AGENT_MASTER_KEY（32 字节 Base64）、AIO_AGENT_INGRESS_TOKEN（至少 32 字节）、AIO_AGENT_ENDPOINTS（逗号分隔的完整兼容 API 基址）。只从可信代理转发 x-aio-tenant-id、x-aio-user-id、x-aio-token；入口端口不得绕过代理公开。
-
-上述 AIO_AGENT_* 环境变量仅用于独立服务和本地开发；Memory 开发桥另需 AIO_AGENT_MEMORY_URL 和 AIO_AGENT_MEMORY_TOKEN。正式 process 只读取宿主配置文件，不继承开发主密钥和 preview/developer 身份。
-
-生产数据库由受控迁移器部署 backend/migrations 后只授予数据角色 DML 和序列权限。卸载不删除 schema。一次仅允许一个实例拥有同一 schema 的生成任务，切换必须先停止并排空旧实例，不能宣称此 process 示例已经支持无缝在线替换。
+升级前备份插件数据库与宿主密钥，再核对发布源码 SHA、包摘要、租户活动版本和实际浏览器。数据库或 keyring 之一丢失都可能导致秘密无法恢复。

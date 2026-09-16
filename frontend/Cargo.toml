@@ -1,0 +1,16 @@
+[package]
+name = "az-agent-frontend"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+az-agent-model = { path = "../shared/rust" }
+az-ui-components = { git = "https://github.com/zjarlin/dioxus-admin-workbench.git", rev = "c51ef561b8a68545482dd56b235515cc9c8b30bc" }
+dioxus = { version = "=0.7.9", default-features = false, features = ["macro", "html", "signals", "hooks", "document", "web", "launch"] }
+serde.workspace = true
+serde_json.workspace = true
+uuid = { workspace = true, features = ["js"] }
+gloo-timers = { version = "0.3", features = ["futures"] }
+web-sys = { version = "0.3", features = ["Window", "Location"] }
+console_error_panic_hook = "0.1.7"
