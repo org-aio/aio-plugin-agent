@@ -20,7 +20,7 @@ export function runtimeModelResponse(input, response, authorization) {
     ["memory_search"],
   );
   const results = input.messages.filter((message) => message.role === "tool");
-  if (results.length) assert(results[0].content.includes("没有找到相关资料"), JSON.stringify(results[0]));
+  if (results.length) assert(results[0].content.includes("没有找到相关资料"));
   const complete = results.length === 2;
   const delta = complete
     ? { content: "已通过 Rust 工具读取记忆。" }
@@ -33,7 +33,8 @@ export function runtimeModelResponse(input, response, authorization) {
             function: {
               name: "memory_search",
               arguments: JSON.stringify({
-                query: results.length ? title : "请分析执行结果",
+                // 空结果用不存在的检索词，避免后台整理恰好完成时命中本轮新资料。
+                query: results.length ? title : "zzqf16be774e18d493083ece7f493beab90e",
               }),
             },
           },
