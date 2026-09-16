@@ -77,4 +77,4 @@ npm run test:browser
 
 默认分支推送后，平台通过 `aio-delivery.toml` 发现完整 Git SHA，在固定摘要的 Fullstack 镜像中构建 Compose 前端与 Rust 服务，再校验 v2 包、发布市场并升级仍启用该插件的租户。构建失败保留活动版本，停用和卸载不会被自动恢复；手动回滚会跳过当前发布版本，后续新版本才继续跟进。
 
-构建使用 `scripts/build.sh`，源码、依赖版本和产物摘要随交付任务保存；发布凭据仅在服务器交付进程中，构建容器不接收发布凭据。平台和工作进程须支持 v2 自动交付及 `AIO_BUILD_IMAGE_FULLSTACK`。
+正式交付使用 `scripts/build.sh --process`，生成 glibc 2.17 的 Linux 服务；本地开发继续使用 `scripts/build.sh`。源码、依赖版本和产物摘要随交付任务保存；发布凭据仅在服务器交付进程中，构建容器不接收发布凭据。平台和工作进程须支持 v2 自动交付及 `AIO_BUILD_IMAGE_FULLSTACK`。
