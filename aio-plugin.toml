@@ -11,14 +11,14 @@ tags = ["智能体", "对话", "记忆"]
 
 [plugin.runtime]
 artifact = "dist/agent-server"
-host_version = ">=2026.9.18"
+host_version = ">=2026.9.19"
 
 [plugin.runtime.process]
 image = "sha256:48a661b5e5f4560287dfc254e948825538d0f7a1379616495a424ed375afd31f"
 endpoints = ["https://api.openai.com/v1", "https://company-ai.addzero.site/v1", "http://192.168.31.252:18080/v1"]
 http_endpoints = ["https://api.tavily.com/search"]
 services = ["https://github.com/zjarlin/aio-plugin-agent-memory.git"]
-worker_capabilities = ["desktop.open-app", "skills.sync"]
+worker_capabilities = ["desktop.open-app", "skills.sync", "workspace.execute"]
 
 [plugin.frontend]
 path = "dist/frontend"

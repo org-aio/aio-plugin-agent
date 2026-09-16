@@ -20,3 +20,10 @@ mod user_input;
 
 #[cfg(test)]
 mod input_tests;
+
+mod swarm_model;
+mod swarm_store;
+mod swarm_tools;
+
+#[cfg(test)]
+mod swarm_tests;

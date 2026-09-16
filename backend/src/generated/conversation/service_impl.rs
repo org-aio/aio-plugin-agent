@@ -264,6 +264,7 @@ impl AgentService for AgentServiceImpl {
         if jobs.contains_key(&id) {
             return Err(conflict("请先停止生成"));
         }
+        super::swarm_store::cancel(&self.core, scope, id, None).await?;
         sqlx::query("DELETE FROM agent_conversations WHERE id=$1 AND tenant_id=$2 AND user_id=$3")
             .bind(id)
             .bind(&scope.tenant)
@@ -277,8 +278,12 @@ impl AgentService for AgentServiceImpl {
     }
     async fn cancel(&self, scope: &Scope, id: Uuid) -> ServiceResult<Thread> {
         store::owned(&self.core.pool, scope, id).await?;
-        if let Some(token) = self.core.jobs.lock().await.get(&id) {
-            token.cancel();
+        {
+            let jobs = self.core.jobs.lock().await;
+            if let Some(token) = jobs.get(&id) {
+                token.cancel();
+            }
+            super::swarm_store::cancel(&self.core, scope, id, None).await?;
         }
         super::user_input::cancel(&self.core, id).await?;
         self.thread(scope, id).await
@@ -355,6 +360,15 @@ impl AgentService for AgentServiceImpl {
         selection: DeviceSelection,
     ) -> ServiceResult<Conversation> {
         super::user_input::select_device(&self.core, scope, id, selection).await
+    }
+    async fn swarm_tasks(&self, scope: &Scope, id: Uuid) -> ServiceResult<Vec<SwarmTask>> {
+        super::swarm_store::list(&self.core, scope, id).await
+    }
+    async fn cancel_swarm_task(&self, scope: &Scope, id: Uuid, task: Uuid) -> ServiceResult<()> {
+        store::owned(&self.core.pool, scope, id).await?;
+        let _jobs = self.core.jobs.lock().await;
+        super::swarm_store::cancel(&self.core, scope, id, Some(&[task])).await?;
+        Ok(())
     }
     async fn shutdown(&self) {
         self.core.shutdown.cancel();

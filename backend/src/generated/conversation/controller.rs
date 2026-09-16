@@ -141,3 +141,19 @@ pub async fn select_device(
 ) -> ServiceResult<Json<Conversation>> {
     Ok(Json(service.select_device(&scope, id, selection).await?))
 }
+
+pub async fn swarm_tasks(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path(id): Path<Uuid>,
+) -> ServiceResult<Json<Vec<SwarmTask>>> {
+    Ok(Json(service.swarm_tasks(&scope, id).await?))
+}
+pub async fn cancel_swarm_task(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path((id, task)): Path<(Uuid, Uuid)>,
+) -> ServiceResult<StatusCode> {
+    service.cancel_swarm_task(&scope, id, task).await?;
+    Ok(StatusCode::NO_CONTENT)
+}

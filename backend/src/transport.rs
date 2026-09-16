@@ -85,6 +85,11 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
             "/conversations/{id}",
             get(controller::thread).delete(controller::delete),
         )
+        .route("/conversations/{id}/tasks", get(controller::swarm_tasks))
+        .route(
+            "/conversations/{id}/tasks/{task}/cancel",
+            post(controller::cancel_swarm_task),
+        )
         .route("/devices", get(controller::devices))
         .route(
             "/conversations/{id}/device",

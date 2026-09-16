@@ -15,3 +15,5 @@ Agent 数据库只保存本插件的数据。租约、空间角色、秘密授�
 Memory 的 `greeting` 路由与保存、检索一样直接回复，记为 0 tokens；生成提示仅要求在实际使用记忆事实时引用，避免把问候回答变成记忆链接。
 
 用户输入中断见 `user_input.rs`（加密检查点与恢复）、`input_tool.rs`（1 至 3 题）、`device_routing.rs`（用户确定目标）、`generation.rs`（暂停状态收集）。入口为 `/devices`、`PUT /conversations/{id}/device`、`POST /conversations/{id}/input`。完整行为与现有限制见 `../../../../../docs/device-orchestration.md`。
+
+蜂群入口见 `swarm_tools.rs`（发现/派发/等待/取消）、`swarm_store.rs`（会话关联、加密回执和归属验证）、`swarm_model.rs`（输入）。`GET /conversations/{id}/tasks` 和任务取消接口供结果窗口使用。完整边界见 `docs/swarm-execution.md`。

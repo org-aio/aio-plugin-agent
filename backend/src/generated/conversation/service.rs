@@ -43,6 +43,8 @@ pub trait AgentService: super::super::skills::service::SkillService + Send + Syn
         id: Uuid,
         selection: DeviceSelection,
     ) -> ServiceResult<Conversation>;
+    async fn swarm_tasks(&self, scope: &Scope, id: Uuid) -> ServiceResult<Vec<SwarmTask>>;
+    async fn cancel_swarm_task(&self, scope: &Scope, id: Uuid, task: Uuid) -> ServiceResult<()>;
     async fn shutdown(&self);
     async fn memory_request(
         &self,

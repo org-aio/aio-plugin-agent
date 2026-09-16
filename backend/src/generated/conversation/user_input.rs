@@ -125,9 +125,14 @@ pub(super) async fn answer(
     let mut selected = thread.conversation.worker_id;
     if checkpoint.input.request["kind"] == "device" {
         let id = Uuid::parse_str(&answer.answers["device"]).map_err(|_| bad("设备选择无效"))?;
-        let tools = super::device_tools::tools(&core, scope, assistant, None, "");
-        let tool = tools.first().ok_or_else(|| bad("设备能力已关闭"))?;
-        let devices = tool.invoke(json!({})).await?;
+        let broker = super::device_tools::broker(&core, scope, assistant, None, "")
+            .ok_or_else(|| bad("设备能力已关闭"))?;
+        let capability = checkpoint.input.request["capability"]
+            .as_str()
+            .unwrap_or("desktop.open-app");
+        let devices = broker
+            .request(json!({"operation":"list","capability":capability}))
+            .await?;
         super::device_routing::select(&devices, Some(id), "")
             .map_err(|_| conflict("选定设备已离线或撤权，请恢复设备后重试，或取消任务"))?;
         selected = Some(id);

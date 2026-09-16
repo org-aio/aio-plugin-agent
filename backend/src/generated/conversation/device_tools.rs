@@ -22,17 +22,36 @@ pub(super) fn tools(
     selected: Option<Uuid>,
     prompt: &str,
 ) -> Vec<Arc<dyn Tool>> {
-    let Some(gateway) = core.config.gateway.as_ref() else {
+    let Some(broker) = broker(core, scope, assistant, selected, prompt) else {
         return vec![];
     };
+    let mut tools: Vec<Arc<dyn Tool>> = vec![Arc::new(List(broker.clone()))];
+    if core.config.gateway.as_ref().is_some_and(|g| {
+        g.worker_capabilities
+            .iter()
+            .any(|c| c == "desktop.open-app")
+    }) {
+        tools.push(Arc::new(Open(broker)));
+    }
+    tools
+}
+
+pub(super) fn broker(
+    core: &Core,
+    scope: &Scope,
+    assistant: Uuid,
+    selected: Option<Uuid>,
+    prompt: &str,
+) -> Option<Arc<Broker>> {
+    let gateway = core.config.gateway.as_ref()?;
     if !gateway
         .worker_capabilities
         .iter()
-        .any(|item| item == "desktop.open-app")
+        .any(|c| matches!(c.as_str(), "desktop.open-app" | "workspace.execute"))
     {
-        return vec![];
+        return None;
     }
-    let broker = Arc::new(Broker {
+    Some(Arc::new(Broker {
         client: core.client.clone(),
         token: gateway.token.clone(),
         tenant: scope.tenant.clone(),
@@ -42,11 +61,10 @@ pub(super) fn tools(
         wait: Duration::from_secs(45),
         selected,
         prompt: prompt.into(),
-    });
-    vec![Arc::new(List(broker.clone())), Arc::new(Open(broker))]
+    }))
 }
 
-struct Broker {
+pub(super) struct Broker {
     client: reqwest::Client,
     token: String,
     tenant: String,
@@ -59,7 +77,7 @@ struct Broker {
 }
 
 impl Broker {
-    async fn request(&self, mut body: Value) -> Result<Value> {
+    pub(super) async fn request(&self, mut body: Value) -> Result<Value> {
         // 用户范围来自当前宿主调用上下文，不允许模型覆盖。
         body["tenantId"] = json!(self.tenant);
         body["userId"] = json!(self.user);
@@ -98,14 +116,17 @@ struct Open(Arc<Broker>);
 #[async_trait::async_trait]
 impl Tool for List {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"device_list","description":"列出当前账号已授权应用控制的设备及在线状态。打开应用前先选择设备。","parameters":{"type":"object","properties":{},"additionalProperties":false}}})
+        json!({"type":"function","function":{"name":"device_list","description":"列出当前账号已授权的设备、能力及在线状态。执行前确认目标设备。","parameters":{"type":"object","properties":{},"additionalProperties":false}}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         ensure!(
             arguments.as_object().is_some_and(|v| v.is_empty()),
             "设备列表不接受参数"
         );
-        let devices = self.0.request(json!({"operation":"list"})).await?;
+        let devices = self
+            .0
+            .request(json!({"operation":"list","capability":"*"}))
+            .await?;
         ensure!(devices.is_array(), "设备列表格式无效");
         Ok(devices)
     }
@@ -118,7 +139,10 @@ impl Tool for Open {
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let mut args: Arguments = serde_json::from_value(arguments)?;
-        let devices = self.0.request(json!({"operation":"list"})).await?;
+        let devices = self
+            .0
+            .request(json!({"operation":"list","capability":"desktop.open-app"}))
+            .await?;
         let device = super::device_routing::select(&devices, self.0.selected, &self.0.prompt)?;
         let id = device["id"].as_str().context("设备 ID 缺失")?;
         Uuid::parse_str(id).context("设备 ID 无效")?;

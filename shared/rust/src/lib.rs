@@ -1,3 +1,5 @@
+mod swarm;
+pub use swarm::*;
 mod skills;
 mod user_input;
 use schemars::JsonSchema;

@@ -124,6 +124,7 @@ pub fn ConversationPage() -> Element {
                     }
                     crate::models::ConversationModel {}
                     crate::user_input::ConversationDevice {}
+                    if let Some(current) = thread.as_ref() { crate::swarm::SwarmTasks { conversation:current.conversation.id } }
                 }
                 if let Some(error) = view.error.clone() {
                     p { class: "dx-conversation__error", role: "alert", "{error}" }

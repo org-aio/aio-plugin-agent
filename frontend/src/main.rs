@@ -5,6 +5,7 @@ mod models;
 mod settings;
 mod skills;
 mod state;
+mod swarm;
 mod transport;
 mod user_input;
 use dioxus::prelude::*;
