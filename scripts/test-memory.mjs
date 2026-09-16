@@ -192,6 +192,11 @@ const upstream = await listen(async (req, res) => {
     return;
   }
   let content = "已记录。";
+  const citationProbe = messageText(input.messages.at(-1)).match(
+    /解释行内引用验收 ([a-f0-9]{32})/,
+  );
+  if (!compiling && citationProbe)
+    content = `例会是周三。参考 [模型给出的标题](memory:${citationProbe[1]})；[伪造引用](memory:${"f".repeat(32)})。`;
   if (compiling) {
     const { source } = JSON.parse(messageText(input.messages.at(-1)));
     content = JSON.stringify({
@@ -299,7 +304,13 @@ async function verify() {
   });
   if (process.env.AIO_MEMORY_NOTES_ONLY === "1") {
     const { verifyLocalNotes } = await import("./memory-local-notes-tests.mjs");
-    await verifyLocalNotes({ agent, eventually, provider, canary, modelRequests });
+    await verifyLocalNotes({
+      agent,
+      eventually,
+      provider,
+      canary,
+      modelRequests,
+    });
     return;
   }
   if (process.env.AIO_MEMORY_BROWSER_ONLY === "1") {
@@ -740,6 +751,11 @@ async function verify() {
 try {
   await verify();
 } catch (error) {
+  await writeFile(
+    `${directory}/failure.log`,
+    logs.replaceAll(canary, "[protected]"),
+    { mode: 0o600 },
+  );
   console.error(
     JSON.stringify({ modelCalls: modelRequests.length, failures }).replaceAll(
       canary,

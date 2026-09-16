@@ -9,6 +9,7 @@ export async function verifyRouting({
   canary,
   provider,
 }) {
+  const requestsBefore = modelRequests.length;
   const space = await agent("POST", "/memory", {
     method: "POST",
     path: "/spaces",
@@ -74,6 +75,41 @@ export async function verifyRouting({
   );
   await agent("POST", `${path}/messages`, lookup.prompt);
   assert.equal((await agent("GET", path)).messages.length, 2);
+
+  for (const content of ["hi", "你好！", "Hi!"]) {
+    const greeted = await send(content);
+    assert.equal(greeted.answer.route, "greeting");
+    assert.equal(greeted.answer.tokens, 0);
+    assert(greeted.answer.content.startsWith("你好！"));
+    assert.deepEqual(greeted.answer.citations, []);
+    assert.deepEqual(greeted.answer.activatedNodeIds, []);
+    const source = greeted.thread.messages.at(-2).sourceId;
+    assert.equal(
+      (await memory("GET", `/sources/${source}`)).body.status,
+      "recorded",
+    );
+    assert(
+      !(await memory("GET", inSpace("/graph"))).body.nodes.some(
+        (n) => n.id === source,
+      ),
+    );
+    await agent("POST", `${path}/messages`, greeted.prompt);
+    assert.equal((await agent("GET", path)).messages.length, count);
+  }
+  const claim = await memory(
+    "POST",
+    "/tasks/claim",
+    { spaceId: space.id },
+    "developer",
+    true,
+  );
+  assert.equal(claim.status, 200);
+  assert.equal(claim.body, null);
+  assert.equal(
+    modelRequests.length,
+    requestsBefore,
+    "Greetings and lookup must not call the model",
+  );
 
   const empty = await send("查找 完全不存在的条目");
   assert.equal(empty.answer.route, "recall");

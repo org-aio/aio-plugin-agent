@@ -127,6 +127,22 @@ export async function verifyBrowser({
           assert.deepEqual(errors, []);
           continue;
         }
+        if (process.env.AIO_MESSAGE_BROWSER_ONLY === "1") {
+          const { verifyMessageBody } = await import("./message-browser.mjs");
+          reports.push({
+            name,
+            ...(await verifyMessageBody({
+              page,
+              frame,
+              click,
+              agent,
+              conversation,
+              name,
+            })),
+          });
+          assert.deepEqual(errors, []);
+          continue;
+        }
         const input = frame.getByRole("textbox", {
           name: "消息输入",
           exact: true,

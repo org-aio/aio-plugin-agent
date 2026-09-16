@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -253,6 +252,7 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                         if (message.role == "assistant") {
                             Text(
                                 when (message.route) {
+                                    "greeting" -> "本地回复"
                                     "save" -> "已接收"
                                     "recall" -> "记忆检索"
                                     "model" -> "模型回答"
@@ -272,14 +272,11 @@ private fun Chat(state: AgentState, modifier: Modifier) {
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    SelectionContainer {
-                        Text(
-                            message.content.ifEmpty {
-                                if (message.status == "generating") "…" else ""
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
+                    MessageBody(
+                        message,
+                        !state.busy && message.memoryStatus != "unavailable",
+                        state::openEntry,
+                    )
                     message.error?.let {
                         Text(
                             it,
