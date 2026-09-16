@@ -71,3 +71,11 @@ flowchart TD
 客户端全套 37 项、工作区聚焦 10 项（最终失败映射后重跑）、真实双项目 harness 9 项通过；其中有实际 HTTP 200 响应、文件 hash/备份、退出码 7 和子进程退出证明。宿主 3 项真实隔离 PostgreSQL 测试覆盖设备授权、租户/用户隔离、取消和能力交集。Agent 的持久派发测试验证并发、幂等、加密回执、跨账号拒绝和重启保留。真实 wasm + 后端 + PostgreSQL 的桌面 1440×900、手机 390×844 页面验证刷新保留与失败展示，无横向溢出或控制台错误。
 
 这些隔离测试中的设备路由和模型是 fixture；它们不等于多台物理设备、生产自然语言模型调用或 Windows 验收。发布后应另记实际设备与账号链路的证据。
+
+## 部署核对与本机实例
+
+宿主和独立的 `aio-delivery` 打包进程都必须使用包含 `workspace.execute` 的 Bundle 校验器；只更新宿主会使自动构建在打包阶段报“process 设备能力未开放”。宿主、插件清单和 `AIO_PROCESS_WORKER_CAPABILITIES` 的声明均须匹配。失败构建保留旧活动插件，不能把 Git 推送当成已激活。
+
+2026-09-16 已用临时配对 Mac 经 `https://aio.addzero.site` 的真实出站 HTTPS 队列完成工作区发现、两项目 Git/读取/构建/HTTP 200 验收，保留退出码 7 的失败回执，并验证远程取消清理进程、撤销能力。验收设备随后撤销。实际 Mac worker 0.7.1 已登记 `aio-space`、`aio-agent`、`aio-platform`：前两者具有命名项目检查和文件写入授权，最后一个只读。真实 worker 执行器运行 Space typecheck 与 Agent 测试均退出 0；Cargo 的 rustup 调用别名和 HOME 已覆盖专项回归。
+
+这段记录验证真实宿主与 Mac worker 的传输和执行，未声称生产自然语言模型、多台物理设备或 Windows 已验收。命名工作区通过 `describe` 发现，不应在通用模型提示中硬编码这台机器的绝对路径。
