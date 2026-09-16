@@ -57,13 +57,29 @@ pub async fn run(
                 .iter()
                 .position(|definition| definition["function"]["name"] == call.function.name)
                 .context("模型请求了未授权工具")?;
-            let arguments: Value =
-                serde_json::from_str(&call.function.arguments).context("工具参数格式无效")?;
-            // 工具错误可以由模型解释；底层异常不能把凭据、地址或内部数据带回模型。
-            let value = tools[index]
-                .invoke(arguments)
-                .await
-                .unwrap_or_else(|_| json!({"error":"工具执行失败，请检查插件设置或稍后重试"}));
+            let parameters = &definitions[index]["function"]["parameters"];
+            let empty_object = parameters["type"] == "object"
+                && parameters["additionalProperties"] == false
+                && parameters["properties"]
+                    .as_object()
+                    .is_some_and(|v| v.is_empty())
+                && parameters
+                    .get("required")
+                    .is_none_or(|v| v.as_array().is_some_and(|v| v.is_empty()));
+            let arguments = if call.function.arguments.trim().is_empty() && empty_object {
+                Ok(json!({}))
+            } else {
+                serde_json::from_str::<Value>(&call.function.arguments)
+            };
+            // 参数格式错误不能执行工具；返回固定信息，让模型在轮数限制内修正。
+            let value = match arguments {
+                Ok(arguments) => tools[index].invoke(arguments).await.unwrap_or_else(
+                    |_| json!({"error":"工具执行失败，请检查参数、插件设置或稍后重试"}),
+                ),
+                Err(_) => {
+                    json!({"error":"工具参数格式无效；请按工具 schema 发送 JSON 对象。无参数工具也请使用 {}。本次没有执行。"})
+                }
+            };
             let content = serde_json::to_string(&value)?;
             ensure!(content.len() <= 64000, "工具结果超过配额");
             messages.push(json!({"role":"tool","tool_call_id":call.id,"content":content}));

@@ -80,3 +80,50 @@ async fn rejects_truncated_stream_and_unauthorized_tool() -> Result<()> {
     }
     Ok(())
 }
+
+struct DeviceList(std::sync::atomic::AtomicUsize);
+#[async_trait::async_trait]
+impl Tool for DeviceList {
+    fn definition(&self) -> Value {
+        json!({"type":"function","function":{"name":"devices","parameters":{"type":"object","properties":{},"additionalProperties":false}}})
+    }
+    async fn invoke(&self, args: Value) -> Result<Value> {
+        assert_eq!(args, json!({}));
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(json!({"devices":[]}))
+    }
+}
+
+#[tokio::test]
+async fn empty_argument_tool_executes_but_malformed_json_never_does() -> Result<()> {
+    for raw in ["", "{invalid}"] {
+        let app=Router::new().route("/",post(move |Json(body):Json<Value>|async move {
+            let second=body["messages"].as_array().unwrap().iter().any(|m|m["role"]=="tool");
+            let values=if second {
+                let result:Value=serde_json::from_str(body["messages"].as_array().unwrap().last().unwrap()["content"].as_str().unwrap()).unwrap();
+                assert_eq!(result.get("error").is_some(), !raw.is_empty());
+                vec![json!({"choices":[{"delta":{"content":"已检查"},"finish_reason":"stop"}]})]
+            } else {vec![json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_list","function":{"name":"devices","arguments":raw}}]},"finish_reason":"tool_calls"}]})]};
+            ([("content-type","text/event-stream")],events(values))
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let server = tokio::spawn(async move { axum::serve(listener, app).await });
+        let tool = Arc::new(DeviceList(std::sync::atomic::AtomicUsize::new(0)));
+        let (output, _receive) = tokio::sync::mpsc::channel(32);
+        run(
+            reqwest::Client::new().post(format!("http://{address}/")),
+            "model",
+            vec![],
+            vec![tool.clone()],
+            output,
+        )
+        .await?;
+        assert_eq!(
+            tool.0.load(std::sync::atomic::Ordering::SeqCst),
+            usize::from(raw.is_empty())
+        );
+        server.abort();
+    }
+    Ok(())
+}
