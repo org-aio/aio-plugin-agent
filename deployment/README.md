@@ -2,6 +2,8 @@
 
 模型地址校验复用 shared 协议库的 `process::model_endpoint`。正式 broker 允许已声明且获宿主批准的 HTTPS 或固定私网 IP 的 HTTP；例如本部署 Codex 网关 `http://192.168.31.252:18080/v1`，必须同时加入 `AIO_PROCESS_ENDPOINTS`。HTTP 域名、公网、回环和链路本地地址均不能通过正式出站。独立开发服务仍只接受 HTTPS 或显式开启的本机回环。
 
+公司接口填写完整基址 `https://company-ai.addzero.site/v1`。`http://company-ai.addzero.site` 的协议和路径均不匹配，不能作为已授权地址使用。新增地址需同时更新插件清单的 `plugin.runtime.process.endpoints` 与宿主 `AIO_PROCESS_ENDPOINTS`，重载宿主配置并发布、激活新插件包；仅修改宿主环境文件不会改变旧插件实例的授权。界面通过 `<基址>/models` 获取模型，通过 `<基址>/chat/completions` 请求回复。
+
 AIO 正式接入使用根目录 aio-plugin.toml 的 v2 process 包。宿主需具备固定镜像授权、专属 PostgreSQL 数据角色、持久派生密钥、交互上下文和 Unix broker；旧的零能力 process 入口不能安装本包。
 
 正式宿主按租户启动无网络容器，通过只读挂载传入 AIO_PLUGIN_CONFIG，Agent 在 AIO_PLUGIN_SOCKET 提供服务。数据库只通过专属 Unix 通道连接；模型只能经宿主转发到清单和管理员共同授权的基址。Memory 按来源地址解析到同租户已启用的子插件，交互秘密访问需要仍有效的入站上下文，后台使用 service 身份。
