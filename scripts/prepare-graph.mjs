@@ -1,11 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 
 const lock = JSON.parse(readFileSync("graph/source.lock.json", "utf8"));
 if (!/^[a-f0-9]{40}$/.test(lock.revision))
   throw new Error("Invalid graph revision");
-const repo = resolve(process.env.AIO_GRAPH_SOURCE || "build/graph-source");
+const sourceId = createHash("sha256").update(lock.git).digest("hex");
+const repo = resolve(process.env.AIO_GRAPH_SOURCE || `${homedir()}/.cache/aio/sources/${sourceId}`);
 if (!process.env.AIO_GRAPH_SOURCE) {
   mkdirSync(repo, { recursive: true });
   execFileSync("git", ["init", "-q", repo]);

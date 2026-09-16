@@ -72,3 +72,9 @@ npm run test:browser
 ## 公网状态
 
 提供 v2 process 清单和正式宿主入口，Compose 通过 AIO 的 v2 沙箱桥调用服务。容器无网络，数据库、Memory 和模型调用经过宿主私有 Unix 通道；Pi 不读取挂载中的密钥。上线前需通过宿主数据库副本、父子安装和浏览器验收，发布状态以宿主交付记录为准。构建与授权见 [部署边界](deployment/README.md)。
+
+## 自动交付
+
+默认分支推送后，平台通过 `aio-delivery.toml` 发现完整 Git SHA，在固定摘要的 Fullstack 镜像中构建 Compose 前端与 Rust 服务，再校验 v2 包、发布市场并升级仍启用该插件的租户。构建失败保留活动版本，停用和卸载不会被自动恢复；手动回滚会跳过当前发布版本，后续新版本才继续跟进。
+
+构建使用 `scripts/build.sh`，源码、依赖版本和产物摘要随交付任务保存；发布凭据仅在服务器交付进程中，构建容器不接收发布凭据。平台和工作进程须支持 v2 自动交付及 `AIO_BUILD_IMAGE_FULLSTACK`。
