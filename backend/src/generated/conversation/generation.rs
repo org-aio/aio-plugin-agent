@@ -129,6 +129,7 @@ pub async fn respond(
         tools.push(search);
     }
     tools.extend(super::device_tools::tools(&core, scope, assistant));
+    let command = super::device_command::prepare(&core, scope, assistant, &content);
     let task_core = core.clone();
     tokio::spawn(async move {
         run(
@@ -140,6 +141,7 @@ pub async fn respond(
             connection.secret,
             messages,
             tools,
+            command,
             cancel,
             permit,
         )
@@ -160,6 +162,7 @@ async fn run(
     secret: Option<String>,
     messages: Vec<serde_json::Value>,
     tools: Vec<Arc<dyn Tool>>,
+    command: Option<super::device_command::Command>,
     cancel: CancellationToken,
     _permit: OwnedSemaphorePermit,
 ) {
@@ -168,8 +171,12 @@ async fn run(
     let timeout = core.config.generation_timeout;
     let gateway = core.config.gateway.clone();
     let upstream = tokio::spawn(async move {
-        tokio::time::timeout(
-            timeout,
+        tokio::time::timeout(timeout, async move {
+            if let Some(command) = command {
+                sender.send(Delta::Text(command.execute().await?)).await?;
+                sender.send(Delta::Tokens(0)).await?;
+                return Ok(());
+            }
             runtime::generate(
                 &client,
                 gateway.as_ref(),
@@ -179,8 +186,9 @@ async fn run(
                 messages,
                 tools,
                 sender,
-            ),
-        )
+            )
+            .await
+        })
         .await
     });
     let mut content = String::new();
