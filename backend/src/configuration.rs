@@ -18,6 +18,7 @@ pub struct RuntimeConfig {
 pub struct Gateway {
     pub socket: std::path::PathBuf,
     pub token: String,
+    pub worker_capabilities: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -124,6 +125,7 @@ mod tests {
         config.gateway = Some(Gateway {
             socket: "/broker/gateway.sock".into(),
             token: String::new(),
+            worker_capabilities: Vec::new(),
         });
         assert!(config.endpoint(endpoint).is_ok());
         assert!(config.endpoint("http://192.168.31.253:18080/v1").is_err());

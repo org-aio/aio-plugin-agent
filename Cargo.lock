@@ -257,7 +257,7 @@ dependencies = [
 [[package]]
 name = "az-plugin-contract"
 version = "2026.5.10"
-source = "git+https://github.com/zjarlin/aio-platform.git?rev=6f0ca1d4bcf77935d004292030bd64113bdd1eec#6f0ca1d4bcf77935d004292030bd64113bdd1eec"
+source = "git+https://github.com/zjarlin/aio-platform.git?rev=c84ce81dd461dcb31fc9268dff983b96e714d3d6#c84ce81dd461dcb31fc9268dff983b96e714d3d6"
 dependencies = [
  "serde",
  "serde_json",

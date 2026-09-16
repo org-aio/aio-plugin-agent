@@ -105,6 +105,7 @@ mod tests {
             gateway: Some(crate::configuration::Gateway {
                 socket: socket.clone(),
                 token: "broker-test-token".into(),
+                worker_capabilities: Vec::new(),
             }),
             secret: "search-test-key".into(),
         };

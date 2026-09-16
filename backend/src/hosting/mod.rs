@@ -47,6 +47,7 @@ pub fn load() -> Result<Option<(RuntimeConfig, Ingress)>> {
         gateway: Some(Gateway {
             socket: host.broker_socket.into(),
             token: host.ingress_token.clone(),
+            worker_capabilities: host.worker_capabilities,
         }),
         database_url: host.database_url.context("宿主未授权数据库")?,
         encryption_key,
