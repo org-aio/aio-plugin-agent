@@ -245,6 +245,7 @@ export async function verifyBrowser({
         });
         await click("收起图谱");
         await frame.getByRole("img", { name: "记忆关系图", exact: true }).waitFor({ state: "hidden" });
+        await page.waitForTimeout(250);
         await page.screenshot({ path: `test-results/dioxus-${name}-chat.png` });
         assert.equal(
           await frame

@@ -2,7 +2,8 @@
 set -eu
 node scripts/check-sdk.mjs
 node scripts/check-family.mjs
-dx build --package az-agent-frontend --platform web --release
+cargo fetch --locked
+dx build --package az-agent-frontend --platform web --release --locked --offline
 node scripts/package-frontend.mjs
 TARGET=${AIO_RUST_TARGET:-$(rustc -vV | sed -n 's/^host: //p')}
 if [ "${1:-}" = "--process" ]; then
