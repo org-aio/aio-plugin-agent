@@ -50,6 +50,31 @@ try {
       }
     });
     page.on("pageerror", (e) => errors.push(e.message));
+    if (!mobile) {
+      await page.route("**/invoke", async (route) => {
+        const request = route.request().postDataJSON();
+        if (request.path === "/memory") {
+          return route.fulfill({
+            json: {
+              status: 503,
+              headers: [],
+              body: Array.from(
+                Buffer.from(JSON.stringify({ error: "记忆插件未安装" })),
+              ),
+            },
+          });
+        }
+        if (request.path === "/settings") {
+          const response = await route.fetch();
+          const envelope = await response.json();
+          const value = JSON.parse(Buffer.from(envelope.body).toString());
+          value.memoryAvailable = true;
+          envelope.body = Array.from(Buffer.from(JSON.stringify(value)));
+          return route.fulfill({ response, json: envelope });
+        }
+        return route.continue();
+      });
+    }
     await page.goto(`http://127.0.0.1:${port}`);
     const frame = page.frameLocator("#plugin");
     await frame.getByRole("heading", { name: "继续任务前，请补充" }).waitFor();
@@ -99,6 +124,12 @@ try {
         .getByRole("heading", { name: "继续任务前，请补充" })
         .waitFor();
     }
+    if (!mobile)
+      await frame
+        .getByRole("alert")
+        .filter({ hasText: "记忆空间暂不可用" })
+        .first()
+        .waitFor();
     report.push({ mobile, refreshRetainsQuestion: true, noOverflow: true });
     await context.close();
   }

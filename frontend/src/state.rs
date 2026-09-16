@@ -84,12 +84,18 @@ pub fn run(
 }
 pub async fn load(mut state: Signal<AgentState>, conversation: bool) -> Result<(), String> {
     let settings: Settings = transport::request("GET", "/settings", Value::Null).await?;
+    state.write().settings = Some(settings.clone());
     let spaces = if settings.memory_available {
-        transport::memory("GET", "/spaces", Value::Null).await?
+        match transport::memory("GET", "/spaces", Value::Null).await {
+            Ok(spaces) => spaces,
+            Err(error) => {
+                state.write().error = Some(format!("记忆空间暂不可用：{error}"));
+                Vec::<MemorySpace>::new()
+            }
+        }
     } else {
         Vec::<MemorySpace>::new()
     };
-    state.write().settings = Some(settings.clone());
     state.write().spaces = spaces.clone();
     if !conversation {
         return Ok(());
