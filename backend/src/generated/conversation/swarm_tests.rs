@@ -46,7 +46,12 @@ async fn invoke(State(broker): State<Broker>, Json(body): Json<Value>) -> Json<V
                 broker.submitted.fetch_add(1,Ordering::SeqCst);
                 if body["capability"] == "desktop.control" {
                     assert!(body["input"]["session"].is_string());
-                    json!({"id":id,"worker_id":body["workerId"],"state":"complete","result":{"success":true,"app":"WPS","observation":Uuid::new_v4(),"content":[{"type":"text","text":"A1=小明 B1=18"},{"type":"image","mimeType":"image/jpeg","data":DESKTOP_IMAGE}]},"error":null})
+                    if body["input"]["action"] == "create_spreadsheet" {
+                        assert_eq!(body["input"]["arguments"]["filename"], "小明年龄表.xlsx");
+                        assert_eq!(body["input"]["arguments"]["rows"], json!([["姓名","年龄"],["小明",18]]));
+                        assert!(body["input"]["observation"].is_string());
+                    }
+                    json!({"id":id,"worker_id":body["workerId"],"state":"complete","result":{"success":true,"app":"WPS","observation":Uuid::new_v4(),"content":[{"type":"text","text":"A1=姓名 B1=年龄 A2=小明 B2=18"},{"type":"image","mimeType":"image/jpeg","data":DESKTOP_IMAGE}]},"error":null})
                 } else { json!({"id":id,"worker_id":body["workerId"],"state":"queued","result":null,"error":null}) }
             }).clone();
             broker.concurrent.fetch_sub(1, Ordering::SeqCst);
@@ -221,9 +226,16 @@ async fn swarm_dispatch_is_scoped_concurrent_durable_and_cancellable() -> Result
         Some(a),
         "在 Mac mini 新建表格",
     );
-    let mut observed = desktop[0]
+    let before = desktop[0]
         .invoke(json!({"action":"get_app_state","arguments":{"app":"WPS"}}))
         .await?;
+    assert!(
+        desktop[0]
+            .invoke(json!({"action":"create_spreadsheet","arguments":{"app":"WPS"}}))
+            .await
+            .is_err()
+    );
+    let mut observed = desktop[0].invoke(json!({"action":"create_spreadsheet","observation":before["result"]["observation"],"arguments":{"app":"WPS","filename":"小明年龄表.xlsx","rows":[["姓名","年龄"],["小明",18]]}})).await?;
     assert_eq!(observed["state"], "complete");
     let desktop_id = Uuid::parse_str(observed["task_id"].as_str().context("桌面任务 ID")?)?;
     assert_eq!(desktop[0].take_images(&mut observed).len(), 1);
@@ -247,7 +259,7 @@ async fn swarm_dispatch_is_scoped_concurrent_durable_and_cancellable() -> Result
     let service = AgentServiceImpl::connect(settings).await?;
     assert_eq!(
         result(service.swarm_tasks(&scope, conversation).await)?.len(),
-        3
+        4
     );
     if std::env::var_os("AIO_SWARM_BROWSER").is_some() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;

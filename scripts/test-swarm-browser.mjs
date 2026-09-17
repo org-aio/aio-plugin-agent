@@ -24,11 +24,11 @@ try{
     const output=await frame.getByRole('textbox',{name:'mini 检查的执行结果'}).inputValue();
     assert.equal(JSON.parse(output).success,false);
     assert.equal(JSON.parse(output).jobs[0].result.exitCode,7);
-    await frame.getByText('桌面 · get_app_state · Mac mini · 已回报',{exact:true}).click();
-    const screenshot=frame.getByRole('img',{name:'桌面 · get_app_state的设备截图'});
+    await frame.getByText('桌面 · create_spreadsheet · Mac mini · 已回报',{exact:true}).click();
+    const screenshot=frame.getByRole('img',{name:'桌面 · create_spreadsheet的设备截图'});
     await screenshot.waitFor();
     await screenshot.evaluate(image=>new Promise((resolve,reject)=>{if(image.complete){image.naturalWidth?resolve():reject(new Error('截图解码失败'));}else{image.onload=resolve;image.onerror=reject;}}));
-    const desktopOutput=await frame.getByRole('textbox',{name:'桌面 · get_app_state的执行结果'}).inputValue();
+    const desktopOutput=await frame.getByRole('textbox',{name:'桌面 · create_spreadsheet的执行结果'}).inputValue();
     assert(!desktopOutput.includes('base64'),'截图不能以编码文本展示');
     const metrics=await page.frames().find(f=>f.url().includes('/assets/')).evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
     assert(metrics.scroll<=metrics.width+1,'页面横向溢出');
