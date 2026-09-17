@@ -227,15 +227,13 @@ async fn swarm_dispatch_is_scoped_concurrent_durable_and_cancellable() -> Result
         "在 Mac mini 新建表格",
     );
     let before = desktop[0]
-        .invoke(json!({"action":"get_app_state","arguments":{"app":"WPS"}}))
+        .invoke(json!({"action":"get_app_state","app":"WPS"}))
         .await?;
-    assert!(
-        desktop[0]
-            .invoke(json!({"action":"create_spreadsheet","arguments":{"app":"WPS"}}))
-            .await
-            .is_err()
-    );
-    let mut observed = desktop[0].invoke(json!({"action":"create_spreadsheet","observation":before["result"]["observation"],"arguments":{"app":"WPS","filename":"小明年龄表.xlsx","rows":[["姓名","年龄"],["小明",18]]}})).await?;
+    let rejected = desktop[0]
+        .invoke(json!({"action":"create_spreadsheet","app":"WPS"}))
+        .await?;
+    assert_eq!(rejected["dispatched"], false);
+    let mut observed = desktop[0].invoke(json!({"action":"create_spreadsheet","observation":before["result"]["observation"],"app":"WPS","filename":"小明年龄表.xlsx","rows":[["姓名","年龄"],["小明",18]]})).await?;
     assert_eq!(observed["state"], "complete");
     let desktop_id = Uuid::parse_str(observed["task_id"].as_str().context("桌面任务 ID")?)?;
     assert_eq!(desktop[0].take_images(&mut observed).len(), 1);
