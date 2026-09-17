@@ -17,7 +17,7 @@ export function runtimeModelResponse(input, response, authorization) {
   assert.equal(authorization, "Bearer runtime-provider-key");
   assert.deepEqual(
     input.tools.map((tool) => tool.function.name),
-    ["memory_search"],
+    ["request_user_input", "memory_search", "skill_list", "skill_read"],
   );
   const results = input.messages.filter((message) => message.role === "tool");
   if (results.length) assert(results[0].content.includes("没有找到相关资料"));
