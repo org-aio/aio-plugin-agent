@@ -59,6 +59,63 @@ fn empty_arguments() -> Value {
     json!({})
 }
 
+fn parse_arguments(value: Value) -> std::result::Result<Arguments, &'static str> {
+    let args: Arguments = serde_json::from_value(value).map_err(|_| {
+        "桌面参数格式无效。应用必须放在 arguments.app；首次观察使用 {\"action\":\"get_app_state\",\"arguments\":{\"app\":\"WPS Office\"}}。首次观察省略 observation 和 task_id，不要传空字符串；后续操作的 observation 必须是工具返回的 UUID。请修正参数后继续。"
+    })?;
+    if !args.arguments.is_object() {
+        return Err(
+            "arguments 必须是 JSON 对象，不能是字符串。应用名称放在 arguments.app。请修正参数后继续。",
+        );
+    }
+    if ![
+        "list_apps",
+        "get_app_state",
+        "activate_app",
+        "click",
+        "type_text",
+        "press_key",
+        "scroll",
+        "drag",
+        "set_value",
+        "perform_secondary_action",
+        "create_spreadsheet",
+        "release",
+        "wait",
+    ]
+    .contains(&args.action.as_str())
+    {
+        return Err("桌面动作未开放，请使用工具 schema 中列出的 action。尚未派发设备动作。");
+    }
+    if args.action == "wait" && args.task_id.is_none() {
+        return Err("wait 需要先前回执中的 task_id UUID；不要重新派发原动作。");
+    }
+    if !["list_apps", "release", "wait"].contains(&args.action.as_str())
+        && !args.arguments["app"]
+            .as_str()
+            .is_some_and(|app| !app.trim().is_empty() && app.len() <= 256)
+    {
+        return Err(
+            "缺少 arguments.app，请从 list_apps 的结果选择应用名称，再调用 get_app_state。尚未派发设备动作。",
+        );
+    }
+    if ![
+        "list_apps",
+        "get_app_state",
+        "activate_app",
+        "release",
+        "wait",
+    ]
+    .contains(&args.action.as_str())
+        && args.observation.is_none()
+    {
+        return Err(
+            "缺少 observation。先用 get_app_state 观察目标应用，再把返回的 observation UUID 原样用于本次动作。尚未派发设备动作。",
+        );
+    }
+    Ok(args)
+}
+
 #[async_trait::async_trait]
 impl Tool for Desktop {
     fn definition(&self) -> Value {
@@ -80,7 +137,10 @@ impl Tool for Desktop {
     }
 
     async fn invoke(&self, arguments: Value) -> Result<Value> {
-        let args: Arguments = serde_json::from_value(arguments)?;
+        let args = match parse_arguments(arguments) {
+            Ok(args) => args,
+            Err(error) => return Ok(json!({"error":error,"dispatched":false})),
+        };
         let conversation =
             swarm_store::conversation(&self.core, &self.scope, self.assistant).await?;
         let task = if args.action == "wait" {
@@ -137,38 +197,6 @@ impl Tool for Desktop {
 
 impl Desktop {
     async fn dispatch(&self, conversation: Uuid, args: &Arguments) -> Result<Uuid> {
-        ensure!(
-            [
-                "list_apps",
-                "get_app_state",
-                "activate_app",
-                "click",
-                "type_text",
-                "press_key",
-                "scroll",
-                "drag",
-                "set_value",
-                "perform_secondary_action",
-                "create_spreadsheet",
-                "release"
-            ]
-            .contains(&args.action.as_str()),
-            "桌面动作无效"
-        );
-        ensure!(args.arguments.is_object(), "桌面参数必须为对象");
-        if !["list_apps", "release"].contains(&args.action.as_str()) {
-            ensure!(
-                args.arguments["app"]
-                    .as_str()
-                    .is_some_and(|app| !app.trim().is_empty() && app.len() <= 256),
-                "应用名称无效"
-            );
-        }
-        if !["list_apps", "get_app_state", "activate_app", "release"]
-            .contains(&args.action.as_str())
-        {
-            ensure!(args.observation.is_some(), "需要最新界面观察凭据");
-        }
         let devices = self
             .broker
             .request(json!({"operation":"list","capability":CAPABILITY}))
@@ -212,5 +240,40 @@ impl Desktop {
             ensure!(value["id"] == task.id.to_string(), "桌面任务 ID 不匹配");
         }
         Ok(task.id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_arguments_explain_repair_without_echoing_values() {
+        for value in [
+            json!({"action":"get_app_state","app":"private-canary"}),
+            json!({"action":"get_app_state","arguments":{"app":"WPS"},"observation":"private-canary"}),
+            json!({"action":"get_app_state","arguments":"private-canary"}),
+            json!({"action":"get_app_state","arguments":{}}),
+            json!({"action":"create_spreadsheet","arguments":{"app":"WPS"}}),
+        ] {
+            let error = parse_arguments(value).err().expect("应拒绝参数");
+            assert!(!error.contains("private-canary"));
+            assert!(error.contains("arguments") || error.contains("observation"));
+        }
+    }
+
+    #[test]
+    fn initial_observation_and_observed_actions_keep_distinct_requirements() {
+        assert!(
+            parse_arguments(json!({"action":"get_app_state","arguments":{"app":"WPS"}})).is_ok()
+        );
+        assert!(parse_arguments(json!({"action":"create_spreadsheet","arguments":{"app":"WPS","rows":[["姓名","年龄"],["小明",18]]},"observation":Uuid::new_v4()})).is_ok());
+        assert!(
+            parse_arguments(
+                json!({"action":"shell","arguments":{"app":"WPS"},"observation":Uuid::new_v4()})
+            )
+            .is_err()
+        );
+        assert!(parse_arguments(json!({"action":"wait"})).is_err());
     }
 }
