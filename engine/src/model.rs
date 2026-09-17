@@ -21,6 +21,9 @@ pub struct RunState {
     /// 尚未提交给模型的工具图片，随用户输入检查点一起保存。
     #[serde(default)]
     pub observations: Vec<Value>,
+    /// 本次执行的图片请求被拒绝后，只用界面文字继续，恢复时不重复尝试图片。
+    #[serde(default)]
+    pub text_observations_only: bool,
 }
 
 impl RunState {
@@ -31,6 +34,7 @@ impl RunState {
             rounds_left: 8,
             tokens: 0,
             observations: Vec::new(),
+            text_observations_only: false,
         }
     }
     /// 把用户答案作为原工具调用的结果注入，已完成工具不重新执行。

@@ -12,4 +12,4 @@
 
 执行器还支持 `resume(request, model, RunState, tools, output)`。工具返回 `InputRequired` 时输出 `Delta::Waiting { state, input }` 并结束当前调用。宿主负责加密持久化、授权及收集答案；`state.answer(value)` 将用户输入作为原工具结果注入，`input.retry` 为真时保留当前工具供重新校验。恢复继续剩余调用与轮数，不能从头重放整个 turn。参见 `src/input_tests.rs` 和 `../docs/device-orchestration.md`。
 
-桌面图片通过可信 `Tool::take_images` 提取，编码数据从文本回执移除。本轮所有 tool 回执补齐后才追加包含 `image_url` 的观察消息，防止破坏 Chat Completions 工具顺序；暂停时图片随 RunState 保存，恢复不重放工具。只保留最新一批图片，单轮最多 2 张、每张 data URL 不超过 400 KB，上下文最多 1.5 MB。调用方必须选择支持图像输入和工具调用的模型；引擎不隐式切换供应商。
+桌面图片通过可信 `Tool::take_images` 提取，编码数据从文本回执移除。本轮所有 tool 回执补齐后才追加包含 `image_url` 的观察消息，防止破坏 Chat Completions 工具顺序；暂停时图片随 RunState 保存，恢复不重放工具。只保留最新一批图片，单轮最多 2 张、每张 data URL 不超过 400 KB，上下文最多 1.5 MB。含桌面图片的请求在产生流输出前收到 HTTP 400 时，仅重试一次文字观察；保留工具回执、用户原始图片及模型配置，不重做已执行动作。该轮后续观察使用文字并明确禁止声称看图或猜测坐标，仍可通过辅助功能元素和文件校验完成建表；需要视觉判断的任务须选择支持图片的模型。401/403、无桌面图的错误、重试失败和流中断均不降级。

@@ -8,6 +8,117 @@ struct Lookup;
 
 struct DesktopImage;
 
+struct CountedDesktopImage(std::sync::atomic::AtomicUsize);
+
+#[async_trait::async_trait]
+impl Tool for CountedDesktopImage {
+    fn definition(&self) -> Value {
+        DesktopImage.definition()
+    }
+    async fn invoke(&self, arguments: Value) -> Result<Value> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        DesktopImage.invoke(arguments).await
+    }
+    fn take_images(&self, result: &mut Value) -> Vec<String> {
+        DesktopImage.take_images(result)
+    }
+}
+
+#[tokio::test]
+async fn rejected_desktop_images_continue_with_text_without_replaying_actions() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let requests = Arc::new(AtomicUsize::new(0));
+    let count = requests.clone();
+    let app = Router::new().route("/", post(move |Json(body): Json<Value>| {
+        let count = count.clone();
+        async move {
+            let round = count.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(body["model"], "text-model");
+            // 用户自己的图片不能作为桌面降级的一部分被删除。
+            assert_eq!(body["messages"][0]["content"][0]["type"], "image_url");
+            if round == 1 {
+                assert!(body["messages"].as_array().unwrap().last().unwrap()["content"].is_array());
+                return (axum::http::StatusCode::BAD_REQUEST, "not a multimodal model").into_response();
+            }
+            if round >= 2 {
+                let observations: Vec<_> = body["messages"].as_array().unwrap().iter().filter(|m| m["name"] == "device_observation").collect();
+                assert!(observations.iter().all(|m| m["content"].is_string()));
+                assert!(observations.last().unwrap()["content"].as_str().unwrap().contains("禁止声称已看图或猜测坐标"));
+                assert_eq!(body["messages"].as_array().unwrap().iter().filter(|m| m["role"] == "tool").count(), round - 1);
+            }
+            let chunk = if round == 3 {
+                json!({"choices":[{"delta":{"content":"文件已校验"},"finish_reason":"stop"}]})
+            } else {
+                json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":format!("action_{round}"),"function":{"name":"desktop","arguments":"{}"}}]},"finish_reason":"tool_calls"}]})
+            };
+            ([("content-type", "text/event-stream")], events(vec![chunk])).into_response()
+        }
+    }));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?;
+    let server = tokio::spawn(async move { axum::serve(listener, app).await });
+    let tool = Arc::new(CountedDesktopImage(AtomicUsize::new(0)));
+    let (output, _receive) = tokio::sync::mpsc::channel(32);
+    run(reqwest::Client::new().post(format!("http://{address}/")), "text-model",
+        vec![json!({"role":"user","content":[{"type":"image_url","image_url":{"url":"user-supplied-image"}}]})],
+        vec![tool.clone()], output).await?;
+    assert_eq!(requests.load(Ordering::SeqCst), 4);
+    assert_eq!(tool.0.load(Ordering::SeqCst), 2);
+    server.abort();
+    Ok(())
+}
+
+#[tokio::test]
+async fn desktop_fallback_is_bounded_and_never_retries_authentication_or_text_errors() -> Result<()>
+{
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for (status, desktop_image, expected) in [
+        (400, true, 2),
+        (401, true, 1),
+        (403, true, 1),
+        (400, false, 1),
+    ] {
+        let requests = Arc::new(AtomicUsize::new(0));
+        let count = requests.clone();
+        let app = Router::new().route(
+            "/",
+            post(move || {
+                count.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    (
+                        axum::http::StatusCode::from_u16(status).unwrap(),
+                        "private upstream details",
+                    )
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let server = tokio::spawn(async move { axum::serve(listener, app).await });
+        let messages = if desktop_image {
+            vec![
+                json!({"role":"user","name":"device_observation","content":[{"type":"image_url","image_url":{"url":"data:image/jpeg;base64,/9j/2Q=="}}]}),
+            ]
+        } else {
+            vec![]
+        };
+        let (output, _receive) = tokio::sync::mpsc::channel(32);
+        let error = run(
+            reqwest::Client::new().post(format!("http://{address}/")),
+            "model",
+            messages,
+            vec![],
+            output,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.to_string(), format!("模型服务返回 HTTP {status}"));
+        assert_eq!(requests.load(Ordering::SeqCst), expected);
+        server.abort();
+    }
+    Ok(())
+}
+
 struct Ask;
 #[async_trait::async_trait]
 impl Tool for Ask {
