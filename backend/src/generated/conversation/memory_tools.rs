@@ -20,7 +20,7 @@ pub(super) struct MemoryTools {
 #[async_trait::async_trait]
 impl crate::runtime::Tool for MemoryTools {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"memory_search","description":"检索当前空间的相关记忆；闲聊无需检索。","parameters":{"type":"object","properties":{"query":{"type":"string","maxLength":180}},"required":["query"],"additionalProperties":false}}})
+        json!({"type":"function","strict":false,"name":"memory_search","description":"检索当前空间的相关记忆；闲聊无需检索。","parameters":{"type":"object","properties":{"query":{"type":"string","maxLength":180}},"required":["query"],"additionalProperties":false}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let search: MemorySearch = serde_json::from_value(arguments)?;

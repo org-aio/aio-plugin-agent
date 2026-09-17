@@ -1,8 +1,10 @@
-use crate::model::{Chunk, Completion, Delta};
-use anyhow::{Context, Result, ensure};
+use crate::model::{Completion, Delta, Function, ToolCall};
+use anyhow::{Context, Result, bail, ensure};
 use futures_util::StreamExt;
+use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 
+/// 只接受 Responses SSE；完成事件携带的输出项是工具执行与下一轮上下文的依据。
 pub(crate) async fn completion(
     response: reqwest::Response,
     output: &Sender<Delta>,
@@ -25,7 +27,6 @@ pub(crate) async fn completion(
     let mut data = String::new();
     let mut total = 0;
     let mut result = Completion::default();
-    let mut done = false;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.context("读取模型数据失败")?;
         total += chunk.len();
@@ -38,10 +39,10 @@ pub(crate) async fn completion(
                 .trim_end_matches(['\n', '\r']);
             if line.is_empty() {
                 if !data.is_empty() {
-                    done = apply(data.trim_end(), &mut result, output).await?;
+                    let completed = apply(data.trim_end(), &mut result, output).await?;
                     data.clear();
-                    if done {
-                        break;
+                    if completed {
+                        return Ok(result);
                     }
                 }
             } else if let Some(value) = line.strip_prefix("data:") {
@@ -49,57 +50,99 @@ pub(crate) async fn completion(
                 data.push('\n');
             }
         }
-        if done {
-            break;
-        }
     }
-    ensure!(done && result.finished, "模型流提前中断");
-    Ok(result)
+    bail!("模型流提前中断：缺少 response.completed")
 }
 
 async fn apply(data: &str, result: &mut Completion, output: &Sender<Delta>) -> Result<bool> {
-    if data == "[DONE]" {
-        return Ok(true);
-    }
-    let chunk: Chunk = serde_json::from_str(data).context("模型流格式无效")?;
-    ensure!(chunk.error.is_none(), "模型生成失败");
-    if let Some(usage) = chunk.usage {
-        result.tokens = usage.total_tokens.max(0);
-    }
-    if let Some(choice) = chunk.choices.into_iter().next() {
-        if let Some(reason) = choice.finish_reason {
-            ensure!(
-                matches!(reason.as_str(), "stop" | "tool_calls"),
-                "模型未完成回复：{reason}"
-            );
-            result.finished = true;
+    ensure!(data != "[DONE]", "模型流提前中断：缺少 response.completed");
+    let event: Value = serde_json::from_str(data).context("模型流格式无效")?;
+    match event["type"].as_str().context("模型事件类型缺失")? {
+        "response.output_text.delta" | "response.refusal.delta" => {
+            let text = event["delta"].as_str().context("模型文本增量无效")?;
+            result.text.push_str(text);
+            output.send(Delta::Text(text.into())).await?;
         }
-        if let Some(text) = choice.delta.content {
-            result.text.push_str(&text);
-            output.send(Delta::Text(text)).await?;
+        "response.completed" => {
+            finish(&event["response"], result, output).await?;
+            return Ok(true);
         }
-        for change in choice.delta.tool_calls {
-            ensure!(change.index < 8, "单轮工具调用超过配额");
-            let call = result.calls.entry(change.index).or_default();
-            call.kind = "function".into();
-            if let Some(id) = change.id {
-                call.id.push_str(&id);
-            }
-            if let Some(function) = change.function {
-                if let Some(name) = function.name {
-                    call.function.name.push_str(&name);
-                }
-                if let Some(arguments) = function.arguments {
-                    call.function.arguments.push_str(&arguments);
-                }
-            }
-            ensure!(
-                call.id.len() <= 256
-                    && call.function.name.len() <= 128
-                    && call.function.arguments.len() <= 64000,
-                "工具参数超过配额"
-            );
-        }
+        "response.failed"
+        | "response.incomplete"
+        | "response.cancelled"
+        | "response.canceled"
+        | "error"
+        | "response.error" => bail!("模型生成失败或未完成"),
+        // 中间工具参数可能尚未形成 JSON，必须等待 completed 后才执行工具。
+        _ => {}
     }
     Ok(false)
+}
+
+async fn finish(response: &Value, result: &mut Completion, output: &Sender<Delta>) -> Result<()> {
+    ensure!(
+        response["status"] == "completed" && response["error"].is_null(),
+        "模型未完成回复"
+    );
+    let items = response["output"].as_array().context("模型输出项缺失")?;
+    let mut text = String::new();
+    let mut ids = std::collections::HashSet::new();
+    for (index, item) in items.iter().enumerate() {
+        match item["type"].as_str() {
+            Some("message") => {
+                ensure!(item["role"] == "assistant", "模型输出角色无效");
+                for part in item["content"].as_array().context("模型消息内容无效")? {
+                    let value = match part["type"].as_str() {
+                        Some("output_text") => &part["text"],
+                        Some("refusal") => &part["refusal"],
+                        _ => bail!("模型返回了不支持的消息内容"),
+                    };
+                    text.push_str(value.as_str().context("模型文本内容无效")?);
+                }
+            }
+            Some("function_call") => {
+                let id = item["call_id"].as_str().context("工具调用 ID 缺失")?;
+                let name = item["name"].as_str().context("工具名称缺失")?;
+                let arguments = item["arguments"].as_str().context("工具参数缺失")?;
+                ensure!(
+                    !id.is_empty() && id.len() <= 256 && ids.insert(id),
+                    "工具调用 ID 无效"
+                );
+                ensure!(
+                    !name.is_empty() && name.len() <= 128 && arguments.len() <= 64000,
+                    "工具参数超过配额"
+                );
+                ensure!(result.calls.len() < 8, "单轮工具调用超过配额");
+                result.calls.insert(
+                    index,
+                    ToolCall {
+                        id: id.into(),
+                        kind: "function".into(),
+                        function: Function {
+                            name: name.into(),
+                            arguments: arguments.into(),
+                        },
+                    },
+                );
+            }
+            Some("reasoning" | "compaction") => {}
+            _ => bail!("模型返回了未授权的输出项类型"),
+        }
+    }
+    // 某些网关只在完成事件给出正文；已有增量必须与最终正文一致，禁止重复输出。
+    ensure!(
+        text.starts_with(&result.text),
+        "模型最终文本与流式增量不一致"
+    );
+    let remaining = &text[result.text.len()..];
+    if !remaining.is_empty() {
+        output.send(Delta::Text(remaining.into())).await?;
+    }
+    result.text = text;
+    result.output = items.clone();
+    result.tokens = response["usage"]["total_tokens"]
+        .as_i64()
+        .unwrap_or(0)
+        .max(0);
+    Ok(())
 }

@@ -37,26 +37,29 @@ async fn workers(State(broker): State<Broker>, Json(body): Json<Value>) -> Json<
     })
 }
 async fn egress(Json(body): Json<Value>) -> impl axum::response::IntoResponse {
-    if body.get("messages").is_none() {
+    if body.get("input").is_none() {
         return (
             [("content-type", "application/json")],
             json!({"data":[{"id":"fixture"}]}).to_string(),
         );
     }
-    let answered = body["messages"]
+    let answered = body["input"]
         .as_array()
         .unwrap()
         .iter()
-        .any(|m| m["role"] == "tool");
+        .any(|m| m["type"] == "function_call_output");
     let chunk = if answered {
-        json!({"choices":[{"delta":{"content":"已收到全部配置答案，继续原任务。"},"finish_reason":"stop"}]})
+        json!({"type":"message","role":"assistant","content":[{"type":"output_text","text":"已收到全部配置答案，继续原任务。"}]})
     } else {
         let arguments=json!({"questions":[{"id":"path","title":"配置存放在哪？","options":[],"allowText":true},{"id":"mode","title":"同步哪些内容？","options":[{"value":"shared","label":"共享配置"},{"value":"all","label":"全部配置"}],"allowText":false}]}).to_string();
-        json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"ask_config","type":"function","function":{"name":"request_user_input","arguments":arguments}}]},"finish_reason":"tool_calls"}]})
+        json!({"type":"function_call","call_id":"ask_config","name":"request_user_input","arguments":arguments})
     };
     (
         [("content-type", "text/event-stream")],
-        format!("data: {chunk}\n\ndata: [DONE]\n\n"),
+        format!(
+            "data: {}\n\n",
+            json!({"type":"response.completed","response":{"status":"completed","output":[chunk],"usage":{"total_tokens":1}}})
+        ),
     )
 }
 
@@ -122,7 +125,7 @@ async fn durable_device_question_survives_restart_and_enforces_ownership() -> Re
     let listener = tokio::net::UnixListener::bind(&path)?;
     let router = Router::new()
         .route("/workers", post(workers))
-        .route("/egress", post(egress))
+        .route("/egress/responses", post(egress))
         .route(
             "/egress/models",
             axum::routing::get(|| async { Json(json!({"data":[{"id":"fixture"}]})) }),

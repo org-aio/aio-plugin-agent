@@ -184,7 +184,7 @@ export async function verifyGeneration({
       .slice(callsBefore)
       .some(
         (request) =>
-          request.model === "memory-test" && request.messages.length > 2,
+          request.model === "memory-test" && request.input.length > 2,
       ),
   );
   assert.equal(

@@ -1,3 +1,4 @@
+mod checkpoint;
 mod execution;
 mod model;
 mod stream;

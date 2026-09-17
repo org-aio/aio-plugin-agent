@@ -16,7 +16,7 @@ pub(super) struct AskUser;
 #[async_trait::async_trait]
 impl Tool for AskUser {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"request_user_input","description":"缺少执行必需的信息时，向当前会话用户提出 1 至 3 个问题并暂停。答案返回后继续原任务。不用于询问密码或密钥；设备选择由设备工具自动处理。","parameters":{"type":"object","properties":{"questions":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"object","properties":{"id":{"type":"string"},"title":{"type":"string"},"options":{"type":"array","items":{"type":"object","properties":{"value":{"type":"string"},"label":{"type":"string"}},"required":["value","label"],"additionalProperties":false}},"allowText":{"type":"boolean"}},"required":["id","title","options","allowText"],"additionalProperties":false}}},"required":["questions"],"additionalProperties":false}}})
+        json!({"type":"function","strict":false,"name":"request_user_input","description":"缺少执行必需的信息时，向当前会话用户提出 1 至 3 个问题并暂停。答案返回后继续原任务。不用于询问密码或密钥；设备选择由设备工具自动处理。","parameters":{"type":"object","properties":{"questions":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"object","properties":{"id":{"type":"string"},"title":{"type":"string"},"options":{"type":"array","items":{"type":"object","properties":{"value":{"type":"string"},"label":{"type":"string"}},"required":["value","label"],"additionalProperties":false}},"allowText":{"type":"boolean"}},"required":["id","title","options","allowText"],"additionalProperties":false}}},"required":["questions"],"additionalProperties":false}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let request: Questions = serde_json::from_value(arguments)?;

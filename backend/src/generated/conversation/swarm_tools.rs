@@ -112,7 +112,7 @@ fn parameters_ids(maximum: usize) -> Value {
 #[async_trait::async_trait]
 impl Tool for DispatchTool {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"swarm_dispatch","description":"派发独立任务给已配对设备。先用 input={action:describe} 查询本机授权工作区和命令；再用 action:run,jobs:[{id,workspace,operation,...}]。操作：git.status/git.diff/git.log；fs.read/fs.write(path,content,expectedHash)；project.run(command 为登记名称)。同目录任务串行，不同目录和设备可并发；有依赖的任务拆开轮次。device 只能引用用户明确点名的设备或会话目标，多设备不明确时自动提问。派发只代表入队，必须 swarm_wait 验收结果；项目运行的退出码和验收命令通过才算成功。不会自动修代码或提交Git。","parameters":{"type":"object","properties":{"groups":{"type":"array","minItems":1,"maxItems":4,"items":{"type":"object","properties":{"device":{"type":"string"},"label":{"type":"string","maxLength":80},"input":{"type":"object","properties":{"action":{"type":"string","enum":["describe","run"]},"jobs":{"type":"array","maxItems":8,"items":{"type":"object","properties":{"id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},"workspace":{"type":"string"},"operation":{"type":"string","enum":["git.status","git.diff","git.log","fs.read","fs.write","project.run"]},"path":{"type":"string"},"content":{"type":"string"},"expectedHash":{"type":["string","null"]},"command":{"type":"string"}},"required":["id","workspace","operation"],"additionalProperties":false}}},"required":["action"],"additionalProperties":false}},"required":["label","input"],"additionalProperties":false}}},"required":["groups"],"additionalProperties":false}}})
+        json!({"type":"function","strict":false,"name":"swarm_dispatch","description":"派发独立任务给已配对设备。先用 input={action:describe} 查询本机授权工作区和命令；再用 action:run,jobs:[{id,workspace,operation,...}]。操作：git.status/git.diff/git.log；fs.read/fs.write(path,content,expectedHash)；project.run(command 为登记名称)。同目录任务串行，不同目录和设备可并发；有依赖的任务拆开轮次。device 只能引用用户明确点名的设备或会话目标，多设备不明确时自动提问。派发只代表入队，必须 swarm_wait 验收结果；项目运行的退出码和验收命令通过才算成功。不会自动修代码或提交Git。","parameters":{"type":"object","properties":{"groups":{"type":"array","minItems":1,"maxItems":4,"items":{"type":"object","properties":{"device":{"type":"string"},"label":{"type":"string","maxLength":80},"input":{"type":"object","properties":{"action":{"type":"string","enum":["describe","run"]},"jobs":{"type":"array","maxItems":8,"items":{"type":"object","properties":{"id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},"workspace":{"type":"string"},"operation":{"type":"string","enum":["git.status","git.diff","git.log","fs.read","fs.write","project.run"]},"path":{"type":"string"},"content":{"type":"string"},"expectedHash":{"type":["string","null"]},"command":{"type":"string"}},"required":["id","workspace","operation"],"additionalProperties":false}}},"required":["action"],"additionalProperties":false}},"required":["label","input"],"additionalProperties":false}}},"required":["groups"],"additionalProperties":false}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let context = &self.0;
@@ -193,7 +193,7 @@ impl Tool for DispatchTool {
 #[async_trait::async_trait]
 impl Tool for WaitTool {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"swarm_wait","description":"等待本会话指定任务，最多 20 秒。返回真实子任务状态、退出码、日志和结果；仍在运行可再次等待，不能编造验收。一个任务失败不阻断其他独立任务。","parameters":parameters_ids(4)}})
+        json!({"type":"function","strict":false,"name":"swarm_wait","description":"等待本会话指定任务，最多 20 秒。返回真实子任务状态、退出码、日志和结果；仍在运行可再次等待，不能编造验收。一个任务失败不阻断其他独立任务。","parameters":parameters_ids(4)})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let args: TaskIds = serde_json::from_value(arguments)?;
@@ -227,7 +227,7 @@ impl Tool for WaitTool {
 #[async_trait::async_trait]
 impl Tool for CancelTool {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"swarm_cancel","description":"停止本会话指定设备任务。已结束的结果保留，停止不会回滚已写入的文件。","parameters":parameters_ids(32)}})
+        json!({"type":"function","strict":false,"name":"swarm_cancel","description":"停止本会话指定设备任务。已结束的结果保留，停止不会回滚已写入的文件。","parameters":parameters_ids(32)})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let args: TaskIds = serde_json::from_value(arguments)?;

@@ -187,7 +187,7 @@ pub(super) async fn run(
     let client = core.client.clone();
     let timeout = if tools
         .iter()
-        .any(|tool| tool.definition()["function"]["name"] == "desktop_control")
+        .any(|tool| tool.definition()["name"] == "desktop_control")
     {
         core.config
             .generation_timeout
@@ -230,7 +230,7 @@ pub(super) async fn run(
                     let mut state = az_agent_engine::RunState::new(messages);
                     if tools
                         .iter()
-                        .any(|tool| tool.definition()["function"]["name"] == "desktop_control")
+                        .any(|tool| tool.definition()["name"] == "desktop_control")
                     {
                         state.rounds_left = 32;
                     }

@@ -11,7 +11,7 @@ struct Effect(Arc<AtomicUsize>);
 #[async_trait::async_trait]
 impl Tool for Effect {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"effect","parameters":{"type":"object"}}})
+        json!({"type":"function","strict":false,"name":"effect","parameters":{"type":"object"}})
     }
     async fn invoke(&self, _: Value) -> Result<Value> {
         self.0.fetch_add(1, Ordering::SeqCst);
@@ -22,7 +22,7 @@ struct Ask;
 #[async_trait::async_trait]
 impl Tool for Ask {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"ask","parameters":{"type":"object"}}})
+        json!({"type":"function","strict":false,"name":"ask","parameters":{"type":"object"}})
     }
     async fn invoke(&self, _: Value) -> Result<Value> {
         Err(InputRequired {
@@ -38,15 +38,30 @@ async fn checkpoint_resumes_remaining_calls_without_replaying_completed_effects(
     let calls = Arc::new(AtomicUsize::new(0));
     let observed = Arc::new(AtomicUsize::new(0));
     let received = observed.clone();
-    let router=Router::new().route("/",post(move |Json(body):Json<Value>| {
-        let received=received.clone();async move {
-            received.fetch_add(1,Ordering::SeqCst);
-            let messages=body["messages"].as_array().unwrap();
-            assert_eq!(messages.iter().filter(|m|m["role"]=="tool").count(),3);
-            assert!(messages.iter().any(|m|m["tool_call_id"]=="q" && m["content"].as_str().unwrap().contains("Mac mini")));
-            ([("content-type","text/event-stream")],"data: {\"choices\":[{\"delta\":{\"content\":\"完成\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
-        }
-    }));
+    let router = Router::new().route(
+        "/",
+        post(move |Json(body): Json<Value>| {
+            let received = received.clone();
+            async move {
+                received.fetch_add(1, Ordering::SeqCst);
+                let messages = body["input"].as_array().unwrap();
+                assert_eq!(
+                    messages
+                        .iter()
+                        .filter(|m| m["type"] == "function_call_output")
+                        .count(),
+                    3
+                );
+                assert!(messages.iter().any(|m| m["type"] == "function_call_output"
+                    && m["call_id"] == "q"
+                    && m["output"].as_str().unwrap().contains("Mac mini")));
+                (
+                    [("content-type", "text/event-stream")],
+                    crate::tests::events(vec![crate::tests::text_item("完成")], 0),
+                )
+            }
+        }),
+    );
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let url = format!("http://{}/", listener.local_addr()?);
     let server = tokio::spawn(async move { axum::serve(listener, router).await });
@@ -56,6 +71,7 @@ async fn checkpoint_resumes_remaining_calls_without_replaying_completed_effects(
         {"id":"after","type":"function","function":{"name":"effect","arguments":"{}"}}
     ]))?;
     let mut state = RunState::new(vec![json!({"role":"assistant","tool_calls":pending})]);
+    state.protocol_version = 0;
     state.pending = pending;
     let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(Effect(calls.clone())), Arc::new(Ask)];
     let (send, mut receive) = tokio::sync::mpsc::channel(32);

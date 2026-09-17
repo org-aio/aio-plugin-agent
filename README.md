@@ -121,3 +121,5 @@ Reference designs: [DeepSeek Harness](https://www.deepseek.com/harness/) treats 
 Verification: `cargo test -p az-agent-server --lib`; `AIO_TEST_DATABASE_URL=... node scripts/test-skills.mjs`; after building the frontend, run `AIO_TEST_DATABASE_URL=... node scripts/test-skills-browser.mjs`. The test database must be an isolated local PostgreSQL. Browser verification covers desktop/mobile, create, edit, delete confirmation and overflow checks.
 
 桌面操作复用已配对 worker 与独立的本机授权。安装、观察凭据、截图协议及实际兼容性见 [桌面控制](docs/desktop-control.md)。
+
+模型生成统一使用 Responses 协议，最低宿主版本为 2026.9.21。协议、检查点迁移和验证见 [执行器说明](engine/README.md)。

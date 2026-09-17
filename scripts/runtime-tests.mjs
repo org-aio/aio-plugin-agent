@@ -7,7 +7,7 @@ export function messageText(message) {
   return typeof message.content === "string"
     ? message.content
     : message.content
-        .filter((part) => part.type === "text")
+        .filter((part) => part.type === "input_text")
         .map((part) => part.text)
         .join("\n");
 }
@@ -16,48 +16,41 @@ export function runtimeModelResponse(input, response, authorization) {
   if (input.model !== "runtime-tool") return false;
   assert.equal(authorization, "Bearer runtime-provider-key");
   assert.deepEqual(
-    input.tools.map((tool) => tool.function.name),
+    input.tools.map((tool) => tool.name),
     ["request_user_input", "memory_search", "skill_list", "skill_read"],
   );
-  const results = input.messages.filter((message) => message.role === "tool");
-  if (results.length) assert(results[0].content.includes("没有找到相关资料"));
-  const complete = results.length === 2;
-  const delta = complete
-    ? { content: "已通过 Rust 工具读取记忆。" }
-    : {
-        tool_calls: [
-          {
-            index: 0,
-            id: `memory_lookup_${results.length}`,
-            type: "function",
-            function: {
-              name: "memory_search",
-              arguments: JSON.stringify({
-                // 空结果用不存在的检索词，避免后台整理恰好完成时命中本轮新资料。
-                query: results.length ? title : "zzqf16be774e18d493083ece7f493beab90e",
-              }),
-            },
-          },
-        ],
-      };
-  if (complete)
-    assert(results[1].content.includes("仅工具检索可得到的验收内容"));
-  response.writeHead(200, { "content-type": "text/event-stream" }).end(
-    [
-      `data: ${JSON.stringify({ choices: [{ index: 0, delta, finish_reason: null }] })}\n\n`,
-      `data: ${JSON.stringify({
-        choices: [
-          {
-            index: 0,
-            delta: {},
-            finish_reason: complete ? "stop" : "tool_calls",
-          },
-        ],
-        usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 },
-      })}\n\n`,
-      "data: [DONE]\n\n",
-    ].join(""),
+  const results = input.input.filter(
+    (message) => message.type === "function_call_output",
   );
+  if (results.length) assert(results[0].output.includes("没有找到相关资料"));
+  const complete = results.length === 2;
+  const output = complete
+    ? [
+        {
+          type: "message",
+          role: "assistant",
+          content: [
+            { type: "output_text", text: "已通过 Rust 工具读取记忆。" },
+          ],
+        },
+      ]
+    : [
+        {
+          type: "function_call",
+          call_id: `memory_lookup_${results.length}`,
+          name: "memory_search",
+          arguments: JSON.stringify({
+            query: results.length
+              ? title
+              : "zzqf16be774e18d493083ece7f493beab90e",
+          }),
+        },
+      ];
+  if (complete)
+    assert(results[1].output.includes("仅工具检索可得到的验收内容"));
+  response
+    .writeHead(200, { "content-type": "text/event-stream" })
+    .end(responseEvents(output, 13));
   return true;
 }
 
@@ -110,13 +103,15 @@ export async function verifyRuntime({
   const calls = modelRequests.filter(
     (request) =>
       request.model === "runtime-tool" &&
-      !messageText(request.messages[0]).startsWith("将 source.text"),
+      !messageText(request.input[0]).startsWith("将 source.text"),
   );
   assert.equal(calls.length, 3);
   assert(
-    !JSON.stringify(calls[0].messages).includes("仅工具检索可得到的验收内容"),
+    !JSON.stringify(calls[0].input).includes("仅工具检索可得到的验收内容"),
   );
-  assert(calls[1].messages.some((message) => message.role === "tool"));
+  assert(
+    calls[1].input.some((message) => message.type === "function_call_output"),
+  );
   await memory("DELETE", `/nodes/${note.id}`);
   const removed = (await agent("GET", path)).messages.at(-1);
   assert.equal(removed.memoryStatus, "unavailable");
@@ -124,4 +119,8 @@ export async function verifyRuntime({
   console.log(
     "Rust runtime, native memory tool, controlled credentials and graph activation checks passed",
   );
+}
+
+export function responseEvents(output, tokens = 0) {
+  return `event: response.completed\ndata: ${JSON.stringify({ type: "response.completed", response: { status: "completed", output, usage: { total_tokens: tokens } } })}\n\n`;
 }

@@ -42,14 +42,11 @@ pub(crate) async fn continue_run(
 ) -> Result<()> {
     let mut request = if let Some(gateway) = gateway {
         client
-            .post("http://localhost/egress")
+            .post("http://localhost/egress/responses")
             .header("x-aio-endpoint", endpoint)
             .header("x-aio-token", &gateway.token)
     } else {
-        client.post(format!(
-            "{}/chat/completions",
-            endpoint.trim_end_matches('/')
-        ))
+        client.post(format!("{}/responses", endpoint.trim_end_matches('/')))
     };
     if let Some(secret) = secret {
         request = request.bearer_auth(secret);

@@ -14,7 +14,12 @@ pub enum Delta {
 /// 可持久化执行位置；不包含模型地址、密钥或工具实例。
 #[derive(Clone, serde::Serialize, Deserialize)]
 pub struct RunState {
+    /// Responses 输入项；保留此字段名以读取已有持久化检查点。
     pub messages: Vec<Value>,
+    #[serde(default)]
+    pub(crate) protocol_version: u8,
+    #[serde(default)]
+    pub(crate) observation_indices: Vec<usize>,
     pub pending: Vec<ToolCall>,
     pub rounds_left: u8,
     pub tokens: i64,
@@ -30,6 +35,8 @@ impl RunState {
     pub fn new(messages: Vec<Value>) -> Self {
         Self {
             messages,
+            protocol_version: 1,
+            observation_indices: Vec::new(),
             pending: Vec::new(),
             rounds_left: 8,
             tokens: 0,
@@ -39,9 +46,10 @@ impl RunState {
     }
     /// 把用户答案作为原工具调用的结果注入，已完成工具不重新执行。
     pub fn answer(&mut self, answer: Value) -> Result<()> {
+        crate::checkpoint::upgrade(self)?;
         anyhow::ensure!(!self.pending.is_empty(), "没有等待回答的工具调用");
         let call = self.pending.remove(0);
-        self.messages.push(serde_json::json!({"role":"tool","tool_call_id":call.id,"content":serde_json::to_string(&answer)?}));
+        self.messages.push(serde_json::json!({"type":"function_call_output","call_id":call.id,"output":serde_json::to_string(&answer)?}));
         Ok(())
     }
 }
@@ -75,7 +83,7 @@ pub(crate) struct Completion {
     pub text: String,
     pub calls: std::collections::BTreeMap<usize, ToolCall>,
     pub tokens: i64,
-    pub finished: bool,
+    pub output: Vec<Value>,
 }
 
 #[derive(Clone, Default, serde::Serialize, Deserialize)]
@@ -90,43 +98,4 @@ pub struct ToolCall {
 pub struct Function {
     pub name: String,
     pub arguments: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Chunk {
-    #[serde(default)]
-    pub choices: Vec<Choice>,
-    pub usage: Option<Usage>,
-    pub error: Option<Value>,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Usage {
-    pub total_tokens: i64,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Choice {
-    pub delta: Change,
-    pub finish_reason: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Change {
-    pub content: Option<String>,
-    #[serde(default)]
-    pub tool_calls: Vec<CallChange>,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct CallChange {
-    pub index: usize,
-    pub id: Option<String>,
-    pub function: Option<FunctionChange>,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct FunctionChange {
-    pub name: Option<String>,
-    pub arguments: Option<String>,
 }

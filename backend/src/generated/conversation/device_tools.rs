@@ -117,7 +117,7 @@ struct Open(Arc<Broker>);
 #[async_trait::async_trait]
 impl Tool for List {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"device_list","description":"列出当前账号已授权的设备、能力及在线状态。执行前确认目标设备。","parameters":{"type":"object","properties":{},"additionalProperties":false}}})
+        json!({"type":"function","strict":false,"name":"device_list","description":"列出当前账号已授权的设备、能力及在线状态。执行前确认目标设备。","parameters":{"type":"object","properties":{},"additionalProperties":false}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         ensure!(
@@ -136,7 +136,7 @@ impl Tool for List {
 #[async_trait::async_trait]
 impl Tool for Open {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"device_open_application","description":"在用户已授权的在线设备上打开已安装应用。先调用 device_list；多台设备且用户未指定时，系统自动暂停并请求用户选择。支持打开应用，不支持编辑应用内容或任意文件操作。仅 complete 且有运行进程证明时可报告打开成功。","parameters":{"type":"object","properties":{"worker_id":{"type":"string"},"application":{"type":"string","maxLength":128}},"required":["application"],"additionalProperties":false}}})
+        json!({"type":"function","strict":false,"name":"device_open_application","description":"在用户已授权的在线设备上打开已安装应用。先调用 device_list；多台设备且用户未指定时，系统自动暂停并请求用户选择。支持打开应用，不支持编辑应用内容或任意文件操作。仅 complete 且有运行进程证明时可报告打开成功。","parameters":{"type":"object","properties":{"worker_id":{"type":"string"},"application":{"type":"string","maxLength":128}},"required":["application"],"additionalProperties":false}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let mut args: Arguments = serde_json::from_value(arguments)?;

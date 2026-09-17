@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { spawn, execFileSync } from "node:child_process";
 import {
   messageText,
+  responseEvents,
   runtimeModelResponse,
   verifyRuntime,
 } from "./runtime-tests.mjs";
@@ -160,9 +161,12 @@ const upstream = await listen(async (req, res) => {
     }
     return;
   }
+  assert.equal(req.url, "/v1/responses");
   const input = await jsonBody(req);
+  assert.equal(input.store, false);
+  assert.equal(input.messages, undefined);
   modelRequests.push(input);
-  const compiling = messageText(input.messages[0]).startsWith("将 source.text");
+  const compiling = messageText(input.input[0]).startsWith("将 source.text");
   if (!compiling && runtimeModelResponse(input, res, req.headers.authorization))
     return;
   if (!compiling && input.model === "fail") {
@@ -178,13 +182,13 @@ const upstream = await listen(async (req, res) => {
   if (
     !compiling &&
     (input.model === "slow" ||
-      messageText(input.messages.at(-1)).includes("停止生成验收"))
+      messageText(input.input.at(-1)).includes("停止生成验收"))
   ) {
     res.writeHead(200, { "content-type": "text/event-stream" });
     const timer = setInterval(
       () =>
         res.write(
-          `data: ${JSON.stringify({ choices: [{ delta: { content: "已净化的流式输出。" } }] })}\n\n`,
+          `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "已净化的流式输出。" })}\n\n`,
         ),
       150,
     );
@@ -192,13 +196,13 @@ const upstream = await listen(async (req, res) => {
     return;
   }
   let content = "已记录。";
-  const citationProbe = messageText(input.messages.at(-1)).match(
+  const citationProbe = messageText(input.input.at(-1)).match(
     /解释行内引用验收 ([a-f0-9]{32})/,
   );
   if (!compiling && citationProbe)
     content = `例会是周三。参考 [模型给出的标题](memory:${citationProbe[1]})；[伪造引用](memory:${"f".repeat(32)})。`;
   if (compiling) {
-    const { source } = JSON.parse(messageText(input.messages.at(-1)));
+    const { source } = JSON.parse(messageText(input.input.at(-1)));
     content = JSON.stringify({
       entries: [
         {
@@ -233,7 +237,13 @@ const upstream = await listen(async (req, res) => {
   res
     .writeHead(200, { "content-type": "text/event-stream" })
     .end(
-      `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+      responseEvents([
+        {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: content }],
+        },
+      ]),
     );
 });
 const port = Number(process.env.AIO_MEMORY_TEST_PORT || 4299),

@@ -39,7 +39,7 @@ pub(crate) async fn tool(core: &Core, scope: &Scope) -> Result<Option<Arc<dyn To
 #[async_trait::async_trait]
 impl Tool for WebSearch {
     fn definition(&self) -> Value {
-        json!({"type":"function","function":{"name":"web_search","description":"搜索公开网页中的最新信息，回答时引用结果中的来源 URL。不要把密码、密钥或其他秘密放入查询。","parameters":{"type":"object","properties":{"query":{"type":"string","maxLength":500}},"required":["query"],"additionalProperties":false}}})
+        json!({"type":"function","strict":false,"name":"web_search","description":"搜索公开网页中的最新信息，回答时引用结果中的来源 URL。不要把密码、密钥或其他秘密放入查询。","parameters":{"type":"object","properties":{"query":{"type":"string","maxLength":500}},"required":["query"],"additionalProperties":false}})
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let args: Arguments = serde_json::from_value(arguments)?;
