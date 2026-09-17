@@ -111,7 +111,7 @@ pub async fn respond(
     }
     messages.push(json!({"role":"user","content":content}));
     if safe.conversation.worker_id.is_some() {
-        messages.push(json!({"role":"system","content":"当前请求面向会话绑定的设备。历史会话和记忆中的完成记录只代表过去，不能证明本次已执行；需要历史资料时按需调用 memory_search。若用户要求输入、编辑或创建，必须实际调用相应工具并核对本次结果。list_apps/get_app_state 只证明发现和观察，不能证明已输入或修改。输入文本需使用 desktop_control 的 type_text 或 set_value，再核对当前界面中的目标文本；尚未调用输入工具时应继续执行，不能从记忆推断已经完成。操作结束后调用 release 释放桌面。"}));
+        messages.push(json!({"role":"system","content":"当前请求面向会话绑定的设备。历史会话和记忆中的完成记录只代表过去，不能证明本次已执行；需要历史资料时按需调用 memory_search。若用户要求输入、编辑或创建，必须实际调用相应工具并核对本次结果。list_apps/get_app_state 只证明发现和观察，不能证明已输入或修改。用户仅要求打开表格应用并输入内容、未指定已有文件或单元格时，使用 desktop_control 的 create_spreadsheet 新建包含所需内容的工作簿（单段文字可用一行一列 rows），核对 artifact.verified、artifact.opened 和窗口截图，再报告实际路径。用户指定已有文档时不得新建代替，需使用 type_text 或 set_value，并核对提交后的目标单元格或正文；名称框和编辑中的临时 Value 不能证明正文已写入。尚未实际写入时应继续执行，不能从记忆推断已经完成。操作结束后调用 release 释放桌面。"}));
     }
     if serde_json::to_vec(&messages)
         .map_err(anyhow::Error::from)?

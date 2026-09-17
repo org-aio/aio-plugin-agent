@@ -29,10 +29,16 @@ macOS 上 OCU 0.3.5 的辅助功能和录屏检查通过，能够列举 WPS、�
 
 本改动不是生产上线证明。宿主、Agent 和 worker 必须配套升级并完成本机授权；仓库测试或 push 不代表 npm / 市场已经发布。
 
-参考：[Open Computer Use](https://github.com/anomalyco/computer-use)、[OpenAI 图像输入协议](https://developers.openai.com/api/docs/guides/images-vision)。
+参考：[Open Computer Use](https://github.com/iFurySt/open-codex-computer-use)、[OpenAI 图像输入协议](https://developers.openai.com/api/docs/guides/images-vision)。
 
 ## 创建并打开工作簿
 
 先 get_app_state 获取 app 对应的 observation，再调用 create_spreadsheet。模型工具的参数位于同一层，例如 `{"action":"create_spreadsheet","app":"WPS Office","observation":"<刚返回的 UUID>","filename":"小明年龄表.xlsx","sheet_name":"人员信息","rows":[["姓名","年龄"],["小明",18]]}`，不使用 arguments 包裹。worker 0.8.1 兼容 WPS Office 与系统登记名 wpsoffice 的空格差异，多个应用匹配时仍拒绝启动。worker 只接受标量单元格和等宽行，不接受公式对象、宏或任意路径。每次在本机私有状态目录 documents 下创建独立子目录，因此同名文件不会覆盖。
 
 回执 artifact 包含实际 path、sha256、sheet、rows、columns、verified、opened。verified 表示导出后单元格重新解析通过；opened 表示系统已接受打开请求，仍须核对截图中的窗口和内容。打开或回读失败仍保留已保存文件的回执，不应重派创建。浏览器不直接读取设备路径，用户在本机 WPS 中访问该文件。
+
+## 复合输入指令与验收
+
+“打开wps输入helloworld”整句交给 Responses 工具循环，不截取成应用名。若只要求打开表格应用并输入内容、未指定现有文件或单元格，默认新建内容工作簿：先观察应用，再以 `rows:[["helloworld"]]` 调用 create_spreadsheet，核对导出后重新解析的单元格、实际打开窗口和返回路径。用户指定已有文档时不能以新建文件冒充编辑。
+
+WPS 现有文档编辑仍受 OCU 0.3.5 兼容性限制：type_text 可能无法识别可编辑焦点，set_value 也可能只改变编辑区的临时辅助功能值，回车后并未写入单元格。名称框中的文字、临时 Value 或原生 success 都不足以证明输入完成；必须提交后重新读取目标单元格并核对截图。失败动作已消费 observation，继续前需重新观察。已绑定设备的会话不自动注入跨会话记忆，历史完成记录不能替代本次执行证据。
