@@ -19,3 +19,5 @@ Memory 的 `greeting` 路由与保存、检索一样直接回复，记为 0 toke
 蜂群入口见 `swarm_tools.rs`（发现/派发/等待/取消）、`swarm_store.rs`（会话关联、加密回执和归属验证）、`swarm_model.rs`（输入）。`GET /conversations/{id}/tasks` 和任务取消接口供结果窗口使用。完整边界见 `docs/swarm-execution.md`。
 
 `desktop_tools.rs` 使用独立的 `desktop.control` 授权，在同一设备任务通道中执行观察、点击、输入和结果回读。任务的 capability 随归属和加密结果一起持久化，等待及取消不混用工作区权限。系统提示和工具说明区分工具名 `desktop_control` 与 `action` 值（如 `list_apps`），并给出完整参数示例，避免模型把动作名当作独立工具。图片由工具显式交给 Responses 的 `input_image`；界面只展示最新一张截图，历史回执保留文字。详见 `docs/desktop-control.md`。
+
+自然语言设备请求统一经过 `generation.rs` 的 Responses 工具循环，后端不按“打开”前缀截取应用名。设备选择暂停仍保存实际工具边界，恢复时只继续未完成的调用，避免复合任务被截断或重复打开应用。

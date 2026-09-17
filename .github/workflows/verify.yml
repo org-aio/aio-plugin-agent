@@ -66,6 +66,13 @@ jobs:
       - run: node scripts/check-sdk.mjs
       - run: cargo fmt --all --check
       - run: cargo test --locked --workspace
+      - name: Verify durable device requests and compound instructions
+        env:
+          AIO_AGENT_DEV_DIRECTORY: build/ci-device
+          AIO_INPUT_TEST_CONFIG: build/ci-device/runtime.json
+        run: |
+          node scripts/setup-dev.mjs
+          cargo test --locked -p az-agent-server -- --ignored --test-threads=1
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo build --locked -p az-agent-server
       - run: dx build --package az-agent-frontend --platform web --release

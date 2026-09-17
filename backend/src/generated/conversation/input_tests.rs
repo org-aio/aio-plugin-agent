@@ -29,6 +29,10 @@ async fn workers(State(broker): State<Broker>, Json(body): Json<Value>) -> Json<
     Json(match body["operation"].as_str().unwrap_or("") {
         "list" => broker.devices.lock().unwrap().clone(),
         "openApp" => {
+            assert!(matches!(
+                body["application"].as_str(),
+                Some("QQ" | "WPS Office")
+            ));
             broker.executed.fetch_add(1, Ordering::SeqCst);
             *broker.selected.lock().unwrap() = body["workerId"].as_str().map(str::to_owned);
             json!({"id":body["requestId"],"state":"complete","result":{"running":true,"pid":123}})
@@ -43,13 +47,37 @@ async fn egress(Json(body): Json<Value>) -> impl axum::response::IntoResponse {
             json!({"data":[{"id":"fixture"}]}).to_string(),
         );
     }
-    let answered = body["input"]
-        .as_array()
-        .unwrap()
+    let input = body["input"].as_array().unwrap();
+    let prompt = input
         .iter()
-        .any(|m| m["type"] == "function_call_output");
-    let chunk = if answered {
+        .rev()
+        .find(|item| item["role"] == "user")
+        .unwrap();
+    let opened = input
+        .iter()
+        .any(|item| item["type"] == "function_call_output" && item["call_id"] == "open_app");
+    let answered = input
+        .iter()
+        .any(|item| item["type"] == "function_call_output" && item["call_id"] == "ask_config");
+    let app = match prompt["content"].as_str() {
+        Some("打开 QQ") => Some("QQ"),
+        Some("打开wps输入helloworld") => Some("WPS Office"),
+        _ => None,
+    };
+    let chunk = if let Some(app) = app.filter(|_| !opened) {
+        assert!(
+            body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|tool| tool["name"] == "device_open_application")
+        );
+        json!({"type":"function_call","call_id":"open_app","name":"device_open_application","arguments":json!({"application":app}).to_string()})
+    } else if answered || (opened && app == Some("QQ")) {
         json!({"type":"message","role":"assistant","content":[{"type":"output_text","text":"已收到全部配置答案，继续原任务。"}]})
+    } else if app == Some("WPS Office") {
+        let arguments = json!({"questions":[{"id":"cell","title":"在哪里输入 helloworld？","options":[],"allowText":true}]}).to_string();
+        json!({"type":"function_call","call_id":"ask_config","name":"request_user_input","arguments":arguments})
     } else {
         let arguments=json!({"questions":[{"id":"path","title":"配置存放在哪？","options":[],"allowText":true},{"id":"mode","title":"同步哪些内容？","options":[{"value":"shared","label":"共享配置"},{"value":"all","label":"全部配置"}],"allowText":false}]}).to_string();
         json!({"type":"function_call","call_id":"ask_config","name":"request_user_input","arguments":arguments})
@@ -78,10 +106,9 @@ async fn wait(service: &AgentServiceImpl, scope: &Scope, id: Uuid, status: &str)
     }
     anyhow::bail!("没有进入 {status}")
 }
-async fn launch(service: &AgentServiceImpl, scope: &Scope, id: Uuid) -> Result<()> {
+async fn launch(service: &AgentServiceImpl, scope: &Scope, id: Uuid, prompt: &str) -> Result<()> {
     let request = Uuid::new_v4();
-    for (role, status, content) in [("user", "complete", "打开 QQ"), ("assistant", "queued", "")]
-    {
+    for (role, status, content) in [("user", "complete", prompt), ("assistant", "queued", "")] {
         sqlx::query("INSERT INTO agent_messages(id,conversation_id,request_id,role,content,status,memory_status) VALUES($1,$2,$3,$4,$5,$6,'complete')")
             .bind(Uuid::new_v4()).bind(id).bind(request).bind(role).bind(content).bind(status).execute(&service.core.pool).await?;
     }
@@ -92,7 +119,7 @@ async fn launch(service: &AgentServiceImpl, scope: &Scope, id: Uuid) -> Result<(
             id,
             Prompt {
                 request_id: request,
-                content: "打开 QQ".into(),
+                content: prompt.into(),
             },
             (String::new(), vec![]),
             ModelConnection {
@@ -166,7 +193,7 @@ async fn durable_device_question_survives_restart_and_enforces_ownership() -> Re
             .await,
     )?
     .id;
-    launch(&service, &scope, conversation).await?;
+    launch(&service, &scope, conversation, "打开 QQ").await?;
     let waiting = wait(&service, &scope, conversation, "awaiting_input").await?;
     let question = waiting.pending_input.unwrap();
     assert_eq!(question.questions[0].options.len(), 2);
@@ -251,7 +278,7 @@ async fn durable_device_question_survives_restart_and_enforces_ownership() -> Re
             .select_device(&scope, conversation, DeviceSelection { worker_id: None })
             .await,
     )?;
-    launch(&service, &scope, conversation).await?;
+    launch(&service, &scope, conversation, "打开 QQ").await?;
     let question = wait(&service, &scope, conversation, "awaiting_input")
         .await?
         .pending_input
@@ -276,7 +303,7 @@ async fn durable_device_question_survives_restart_and_enforces_ownership() -> Re
                 .select_device(&scope, conversation, DeviceSelection { worker_id: None })
                 .await,
         )?;
-        launch(&service, &scope, conversation).await?;
+        launch(&service, &scope, conversation, "打开 QQ").await?;
         wait(&service, &scope, conversation, "awaiting_input").await?;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let port = listener.local_addr()?.port();
@@ -309,6 +336,45 @@ async fn durable_device_question_survives_restart_and_enforces_ownership() -> Re
         http.abort();
         assert!(status.success(), "浏览器验收失败");
     }
+    // 完整复合请求必须到达模型；打开应用后仍需继续输入步骤，不能提前回复完成。
+    let compound = result(
+        service
+            .create(
+                &scope,
+                ConversationDraft {
+                    provider_id: Some(provider),
+                    title: "打开并输入".into(),
+                    space_id: None,
+                },
+            )
+            .await,
+    )?
+    .id;
+    result(
+        service
+            .select_device(&scope, compound, DeviceSelection { worker_id: Some(a) })
+            .await,
+    )?;
+    let before = broker.executed.load(Ordering::SeqCst);
+    launch(&service, &scope, compound, "打开wps输入helloworld").await?;
+    let waiting = wait(&service, &scope, compound, "awaiting_input").await?;
+    let question = waiting.pending_input.unwrap();
+    assert_eq!(question.questions[0].title, "在哪里输入 helloworld？");
+    assert_eq!(broker.executed.load(Ordering::SeqCst), before + 1);
+    result(
+        service
+            .answer_input(
+                &scope,
+                compound,
+                InputAnswer {
+                    request_id: question.id,
+                    answers: BTreeMap::from([("cell".into(), "A1".into())]),
+                },
+            )
+            .await,
+    )?;
+    wait(&service, &scope, compound, "complete").await?;
+    assert_eq!(broker.executed.load(Ordering::SeqCst), before + 1);
     let multi = result(
         service
             .create(

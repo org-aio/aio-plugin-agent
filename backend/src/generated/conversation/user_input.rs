@@ -164,8 +164,6 @@ pub(super) async fn answer(
         message.source_id.clone(),
     )
     .await?;
-    let command =
-        super::device_command::prepare(&core, scope, assistant, selected, &checkpoint.prompt);
     let mut tx = core.pool.begin().await?;
     sqlx::query("SELECT id FROM agent_conversations WHERE id=$1 FOR UPDATE")
         .bind(conversation)
@@ -216,7 +214,6 @@ pub(super) async fn answer(
             model.secret,
             checkpoint.state.messages.clone(),
             tools,
-            command,
             cancel,
             permit,
             Some(checkpoint.state),

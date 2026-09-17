@@ -128,13 +128,6 @@ pub async fn respond(
         source,
     )
     .await?;
-    let command = super::device_command::prepare(
-        &core,
-        scope,
-        assistant,
-        safe.conversation.worker_id,
-        &content,
-    );
     tx.commit().await?;
     let cancel = core.shutdown.child_token();
     jobs.insert(id, cancel.clone());
@@ -151,7 +144,6 @@ pub async fn respond(
             connection.secret,
             messages,
             tools,
-            command,
             cancel,
             permit,
             None,
@@ -176,7 +168,6 @@ pub(super) async fn run(
     secret: Option<String>,
     messages: Vec<serde_json::Value>,
     tools: Vec<Arc<dyn Tool>>,
-    command: Option<super::device_command::Command>,
     cancel: CancellationToken,
     _permit: OwnedSemaphorePermit,
     resume: Option<az_agent_engine::RunState>,
@@ -198,28 +189,6 @@ pub(super) async fn run(
     let gateway = core.config.gateway.clone();
     let upstream = tokio::spawn(async move {
         tokio::time::timeout(timeout, async move {
-            if let Some(command) = command {
-                match command.execute().await {
-                    Ok(text) => {
-                        sender.send(Delta::Text(text)).await?;
-                        sender.send(Delta::Tokens(0)).await?;
-                    }
-                    Err(error) => {
-                        if let Some(input) = error.downcast_ref::<az_agent_engine::InputRequired>()
-                        {
-                            sender
-                                .send(Delta::Waiting {
-                                    state: az_agent_engine::RunState::new(messages),
-                                    input: input.clone(),
-                                })
-                                .await?;
-                        } else {
-                            return Err(error);
-                        }
-                    }
-                }
-                return Ok(());
-            }
             runtime::continue_run(
                 &client,
                 gateway.as_ref(),

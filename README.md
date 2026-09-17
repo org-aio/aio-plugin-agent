@@ -86,9 +86,9 @@ The plugin manifest declares `settings_page` and third-party `http_endpoints`, r
 
 Web conversations support requesting “打开 Postman” (Open Postman). First enable app control for an upgraded macOS worker under AIO “我的设备” (My Devices). The Agent lists devices using the current account identity and dispatches the fixed open-app capability, confirming completion with the client-returned process ID; with multiple devices, pick a target first. A wait timeout only reports the result as pending confirmation, without re-executing. The host must authorize `AIO_PROCESS_WORKER_CAPABILITIES=desktop.open-app`. This capability provides no arbitrary shell, keyboard or mouse control.
 
-“打开 应用名”完整指令直接调用设备列表与应用工具，回复由真实任务结果生成，不依赖模型是否愿意调用工具；仅自动选取唯一在线且已授权设备。多台在线设备时要求指定目标。
+自然语言请求完整交给 Responses 工具循环处理，包括“打开wps输入helloworld”等复合指令，不再按“打开”截取余下文本作为应用名。打开、观察、输入和回读分别调用已授权工具；仅自动选取唯一在线且已授权设备，多台设备时先询问目标。
 
-A full “打开 应用名” (Open app-name) instruction calls the device list and app tool directly, and the reply is generated from the real task result rather than from the model's willingness to call tools; only the single online, authorized device is auto-selected. With multiple online devices, a target must be specified.
+Natural-language requests, including compound requests to open an app and enter text, pass intact to the Responses tool loop. The backend does not treat everything after “打开” as an application name. Opening, observing, typing and verification use authorized tools; a single online authorized device can be selected automatically, while multiple devices require a choice.
 
 ## 设备与 Skill / Devices & Skills
 
