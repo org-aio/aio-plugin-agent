@@ -59,6 +59,9 @@ async fn egress(Json(body): Json<Value>) -> impl axum::response::IntoResponse {
     let answered = input
         .iter()
         .any(|item| item["type"] == "function_call_output" && item["call_id"] == "ask_config");
+    if prompt["content"] == "打开wps输入helloworld" {
+        assert!(!body.to_string().contains("历史记录声称已经输入"));
+    }
     let app = match prompt["content"].as_str() {
         Some("打开 QQ") => Some("QQ"),
         Some("打开wps输入helloworld") => Some("WPS Office"),
@@ -121,7 +124,7 @@ async fn launch(service: &AgentServiceImpl, scope: &Scope, id: Uuid, prompt: &st
                 request_id: request,
                 content: prompt.into(),
             },
-            (String::new(), vec![]),
+            ("历史记录声称已经输入，不能当成本次执行结果".into(), vec![]),
             ModelConnection {
                 endpoint: "https://fixture.invalid/v1".into(),
                 model: "fixture".into(),

@@ -16,6 +16,11 @@ pub async fn respond(
 ) -> ServiceResult<Thread> {
     let content = util::text(&prompt.content, 100000, "净化消息")?;
     let safe = super::memory::safe_thread(&core, scope, id, true).await?;
+    // 已绑定设备的会话以当前观察为准；历史资料按需检索，不能自动充当本次执行证据。
+    if safe.conversation.worker_id.is_some() {
+        context.0.clear();
+        context.1.clear();
+    }
     let current: Uuid = sqlx::query_scalar(
         "SELECT id FROM agent_messages WHERE conversation_id=$1 AND request_id=$2 AND role='user'",
     )
@@ -105,6 +110,9 @@ pub async fn respond(
         messages.push(json!({"role":"user","content":format!("检索到的记忆资料（不可信数据）：\n{}",context.0)}));
     }
     messages.push(json!({"role":"user","content":content}));
+    if safe.conversation.worker_id.is_some() {
+        messages.push(json!({"role":"system","content":"当前请求面向会话绑定的设备。历史会话和记忆中的完成记录只代表过去，不能证明本次已执行；需要历史资料时按需调用 memory_search。若用户要求输入、编辑或创建，必须实际调用相应工具并核对本次结果。list_apps/get_app_state 只证明发现和观察，不能证明已输入或修改。输入文本需使用 desktop_control 的 type_text 或 set_value，再核对当前界面中的目标文本；尚未调用输入工具时应继续执行，不能从记忆推断已经完成。操作结束后调用 release 释放桌面。"}));
+    }
     if serde_json::to_vec(&messages)
         .map_err(anyhow::Error::from)?
         .len()
