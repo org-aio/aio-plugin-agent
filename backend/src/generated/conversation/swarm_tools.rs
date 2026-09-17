@@ -165,7 +165,8 @@ impl Tool for DispatchTool {
         );
         let mut dispatches = Vec::new();
         for (task, input) in prepared {
-            let active = swarm_store::record(&context.core, conversation, &task).await?;
+            let active =
+                swarm_store::record(&context.core, conversation, &task, CAPABILITY).await?;
             dispatches.push((task, input, active));
         }
         let outcomes = stream::iter(dispatches.into_iter().map(|(mut task, input, active)| {

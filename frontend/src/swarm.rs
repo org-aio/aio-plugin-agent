@@ -58,7 +58,7 @@ fn TaskDialog(conversation: Uuid, on_close: Callback<()>) -> Element {
     rsx! {
         Dialog { open:true, on_open_change:move |value:bool|if !value { on_close.call(()) },
             DialogTitle { "蜂群任务" }
-            p { "按设备和工作区执行独立任务。已回报表示收到结果，请展开检查各项状态、退出码和日志。" }
+            p { "查看设备操作和工作区任务。已回报表示收到结果，请展开核对截图、状态和执行结果。" }
             if let Some(error)=error() { p { role:"alert", "{error}" } }
             if loading() { p { "正在读取设备回执…" } }
             if !loading() && tasks.read().is_empty() { p { "还没有设备任务。在对话中说明项目和目标，让智能体派发。" } }
@@ -68,7 +68,7 @@ fn TaskDialog(conversation: Uuid, on_close: Callback<()>) -> Element {
                     p { "任务：{task.id}" }
                     if let Some(message)=task.error { p { role:"status", "{message}" } }
                     if let Some(result)=task.result {
-                        Textarea { aria_label:format!("{}的执行结果",task.label), value:serde_json::to_string_pretty(&result).unwrap_or_default(), readonly:true, rows:10 }
+                        TaskResult { label:task.label.clone(), result }
                     }
                     if matches!(task.state.as_str(), "queued" | "running" | "unconfirmed" | "cancelling") {
                         Button { variant:ButtonVariant::Outline, disabled:stopping().is_some(),
@@ -87,5 +87,26 @@ fn TaskDialog(conversation: Uuid, on_close: Callback<()>) -> Element {
             if state.read().running() { p { "主智能体仍在执行，独立子任务会继续更新。" } }
             Button { variant:ButtonVariant::Outline, onclick:move |_|on_close.call(()), "关闭" }
         }
+    }
+}
+
+#[component]
+fn TaskResult(label: String, mut result: Value) -> Element {
+    let mut screenshot = None;
+    if let Some(content) = result.get_mut("content").and_then(Value::as_array_mut) {
+        for item in content {
+            if item["type"] == "image" && item["mimeType"] == "image/jpeg" {
+                if let Some(data) = item["data"].as_str() {
+                    screenshot = Some(format!("data:image/jpeg;base64,{data}"));
+                }
+                *item = serde_json::json!({"type":"text","text":"截图显示于上方。"});
+            }
+        }
+    }
+    rsx! {
+        if let Some(src) = screenshot {
+            img { class:"max-w-full h-auto", src, alt:format!("{label}的设备截图") }
+        }
+        Textarea { aria_label:format!("{label}的执行结果"), value:serde_json::to_string_pretty(&result).unwrap_or_default(), readonly:true, rows:10 }
     }
 }

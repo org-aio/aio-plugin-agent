@@ -4,10 +4,12 @@
 
 `run(request, model, messages, tools, output)` 接受已经授权的 reqwest 请求模板、OpenAI 兼容历史、工具实例及有界增量通道。模型在每次调用时注入，所以同一会话可以在下一轮更换模型。工具名称仅用于模型线协议，不作为应用插件的运行时注册身份。
 
-流中断、非成功 HTTP、非法工具和上下文超额返回错误；取消直接丢弃执行 future。工具失败返回不含内部错误信息的模型可读结果。最多 8 轮，每轮最多 8 个工具；不自动重试已经输出文本或执行工具的请求。
+流中断、非成功 HTTP、非法工具和上下文超额返回错误；取消直接丢弃执行 future。工具失败返回不含内部错误信息的模型可读结果。默认最多 8 轮，宿主可以通过 RunState.rounds_left 设置预算，每轮最多 8 个工具；不自动重试已经输出文本或执行工具的请求。
 
 验证：`cargo test -p az-agent-engine`。
 
 无参数且明确禁止额外字段的对象工具支持空 arguments；其他非法 JSON 只返回工具错误，模型可在 8 轮上限内修正，未通过解析时不调用工具。
 
 执行器还支持 `resume(request, model, RunState, tools, output)`。工具返回 `InputRequired` 时输出 `Delta::Waiting { state, input }` 并结束当前调用。宿主负责加密持久化、授权及收集答案；`state.answer(value)` 将用户输入作为原工具结果注入，`input.retry` 为真时保留当前工具供重新校验。恢复继续剩余调用与轮数，不能从头重放整个 turn。参见 `src/input_tests.rs` 和 `../docs/device-orchestration.md`。
+
+桌面图片通过可信 `Tool::take_images` 提取，编码数据从文本回执移除。本轮所有 tool 回执补齐后才追加包含 `image_url` 的观察消息，防止破坏 Chat Completions 工具顺序；暂停时图片随 RunState 保存，恢复不重放工具。只保留最新一批图片，单轮最多 2 张、每张 data URL 不超过 400 KB，上下文最多 1.5 MB。调用方必须选择支持图像输入和工具调用的模型；引擎不隐式切换供应商。

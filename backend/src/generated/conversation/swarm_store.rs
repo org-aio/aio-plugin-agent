@@ -11,15 +11,20 @@ pub(super) async fn conversation(core: &Core, scope: &Scope, assistant: Uuid) ->
 }
 
 /// 派发时保存关联与展示名称；终态回执由读取流程加密缓存。
-pub(super) async fn record(core: &Core, conversation: Uuid, task: &SwarmTask) -> Result<bool> {
+pub(super) async fn record(
+    core: &Core,
+    conversation: Uuid,
+    task: &SwarmTask,
+    capability: &str,
+) -> Result<bool> {
     let count: i64 =
         sqlx::query_scalar("SELECT count(*) FROM agent_swarm_tasks WHERE assistant_id=$1")
             .bind(task.assistant_id)
             .fetch_one(&core.pool)
             .await?;
     ensure!(count < 32, "单轮设备任务已达到上限");
-    let cancelled: bool = sqlx::query_scalar("INSERT INTO agent_swarm_tasks(id,conversation_id,assistant_id,worker_id,device,label) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO UPDATE SET id=EXCLUDED.id RETURNING cancelled")
-        .bind(task.id).bind(conversation).bind(task.assistant_id).bind(task.worker_id).bind(&task.device).bind(&task.label).fetch_one(&core.pool).await?;
+    let cancelled: bool = sqlx::query_scalar("INSERT INTO agent_swarm_tasks(id,conversation_id,assistant_id,worker_id,device,label,capability) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET id=EXCLUDED.id RETURNING cancelled")
+        .bind(task.id).bind(conversation).bind(task.assistant_id).bind(task.worker_id).bind(&task.device).bind(&task.label).bind(capability).fetch_one(&core.pool).await?;
     Ok(!cancelled)
 }
 
@@ -28,7 +33,29 @@ pub(super) async fn list(
     scope: &Scope,
     conversation: Uuid,
 ) -> ServiceResult<Vec<SwarmTask>> {
-    read(core, scope, conversation, None).await
+    let mut tasks = read(core, scope, conversation, None).await?;
+    let mut retained = false;
+    // 任务列表只携带最新截图，避免每次轮询反复传输数十张历史图片。
+    for task in &mut tasks {
+        let Some(content) = task
+            .result
+            .as_mut()
+            .and_then(|value| value.get_mut("content"))
+            .and_then(Value::as_array_mut)
+        else {
+            continue;
+        };
+        for item in content {
+            if item["type"] != "image" {
+                continue;
+            }
+            if retained {
+                *item = json!({"type":"text","text":"历史截图已省略，查看最新桌面任务的截图。"});
+            }
+            retained = true;
+        }
+    }
+    Ok(tasks)
 }
 
 pub(super) async fn read(
@@ -57,51 +84,49 @@ pub(super) async fn read(
                 result: None,
                 error: Some("暂未取得设备回执，请刷新核对；不会自动重派任务。".into()),
             };
-            if terminal(&row.get::<String, _>("state")) {
-                if let Some(cipher) = row.get::<Option<Vec<u8>>, _>("ciphertext") {
-                    if let Ok(plain) = util::decrypt(
+            if terminal(&row.get::<String, _>("state"))
+                && let Some(cipher) = row.get::<Option<Vec<u8>>, _>("ciphertext")
+                    && let Ok(plain) = util::decrypt(
                         &core.config.encryption_key,
                         &cipher,
                         &util::owner(scope, task.id),
-                    ) {
-                        if let Ok(cached) = serde_json::from_str::<SwarmTask>(&plain) {
+                    )
+                        && let Ok(cached) = serde_json::from_str::<SwarmTask>(&plain) {
                             return cached;
                         }
-                    }
-                }
-            }
             let Some(broker) = broker else {
                 return task;
             };
             let response = broker
                 .request(
-                    json!({"operation":"task","capability":"workspace.execute","taskId":task.id}),
+                    json!({"operation":"task","capability":row.get::<String, _>("capability"),"taskId":task.id}),
                 )
                 .await;
-            if let Ok(value) = response {
-                if value["id"] == task.id.to_string()
+            if let Ok(value) = response
+                && value["id"] == task.id.to_string()
                     && value["worker_id"] == task.worker_id.to_string()
                 {
                     task.state = value["state"].as_str().unwrap_or("unconfirmed").into();
                     task.result = value.get("result").filter(|r| !r.is_null()).cloned();
                     task.error = value["error"].as_str().map(str::to_owned);
                 }
-            }
             if row.get::<bool, _>("cancelled")
                 && matches!(task.state.as_str(), "queued" | "running" | "unconfirmed")
             {
                 task.state = "cancelling".into();
                 task.error = Some("已请求停止，等待设备确认；断网时受任务租约约束。".into());
             }
-            task.result = task.result.map(compact_result);
-            if terminal(&task.state) {
-                if let Ok(plain) = serde_json::to_string(&task) {
-                    if let Ok(cipher) = util::encrypt(
+            if row.get::<String, _>("capability") == "workspace.execute" {
+                task.result = task.result.map(compact_result);
+            }
+            if terminal(&task.state)
+                && let Ok(plain) = serde_json::to_string(&task)
+                    && let Ok(cipher) = util::encrypt(
                         &core.config.encryption_key,
                         &plain,
                         &util::owner(scope, task.id),
-                    ) {
-                        if sqlx::query(
+                    )
+                        && sqlx::query(
                             "UPDATE agent_swarm_tasks SET state=$2,ciphertext=$3 WHERE id=$1",
                         )
                         .bind(task.id)
@@ -114,9 +139,6 @@ pub(super) async fn read(
                             task.error =
                                 Some("结果已收到，持久化暂时失败；可刷新重新查询。".into());
                         }
-                    }
-                }
-            }
             task
         }
     }))
@@ -159,18 +181,20 @@ pub(super) async fn cancel(
     if let Some(ids) = ids {
         owned_ids(core, conversation, ids).await?;
     }
-    let ids: Vec<Uuid> = sqlx::query_scalar("UPDATE agent_swarm_tasks SET cancelled=true WHERE conversation_id=$1 AND state NOT IN ('complete','failed','cancelled','interrupted') AND ($2::uuid[] IS NULL OR id=ANY($2)) RETURNING id")
+    let tasks = sqlx::query("UPDATE agent_swarm_tasks SET cancelled=true WHERE conversation_id=$1 AND state NOT IN ('complete','failed','cancelled','interrupted') AND ($2::uuid[] IS NULL OR id=ANY($2)) RETURNING id,capability")
         .bind(conversation).bind(ids).fetch_all(&core.pool).await?;
-    if ids.is_empty() {
+    if tasks.is_empty() {
         return Ok(());
     }
     let broker =
         device_tools::broker(core, scope, Uuid::nil(), None, "").context("设备能力已关闭")?;
-    let outcomes = stream::iter(ids.into_iter().map(|id| {
+    let outcomes = stream::iter(tasks.into_iter().map(|row| {
+        let id: Uuid = row.get("id");
+        let capability: String = row.get("capability");
         let broker = broker.clone();
         async move {
             broker
-                .request(json!({"operation":"cancel","capability":"workspace.execute","taskId":id}))
+                .request(json!({"operation":"cancel","capability":capability,"taskId":id}))
                 .await
         }
     }))

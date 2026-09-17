@@ -32,9 +32,9 @@ After installation, open the Agent in the workspace and open its configuration f
 
 Sessions and messages reuse the existing PostgreSQL tables. Sending first persists encrypted receipts and idempotent UUIDs; Memory isolates secrets before organizing and generating. After a source is deleted or de-authorized, dependent content is neither displayed nor carried into later context. Background organization is resumable and preempted by the foreground; in-flight replies persist every 250ms, the browser reads snapshots every 650ms, and polling stops when done.
 
-Rust 引擎直接处理兼容 `/chat/completions` SSE，要求有效结束标记；支持最多 8 轮工具调用、4 个前台并发和 120 秒总超时。工具包括授权的 `memory_search` 和可选 `web_search`，不开放 Shell 或本地文件执行。网页与记忆结果均作为不可信资料。模型凭据与工具密钥不写入日志、前端资产或 Git。
+Rust 引擎直接处理兼容 `/chat/completions` SSE，要求有效结束标记；默认支持最多 8 轮工具调用、4 个前台并发和 120 秒总超时；启用桌面工具的生成使用 32 轮及至少 600 秒预算。工具包括授权的 `memory_search` 和可选 `web_search`，不开放 Shell 或本地文件执行。网页与记忆结果均作为不可信资料。模型凭据与工具密钥不写入日志、前端资产或 Git。
 
-The Rust engine handles compatible `/chat/completions` SSE directly and requires a valid termination marker; it supports up to 8 tool-call rounds, 4 foreground concurrent turns and a 120-second total timeout. Tools include the authorized `memory_search` and optional `web_search`; Shell or local file execution is not exposed. Web and memory results are both treated as untrusted material. Model credentials and tool keys are never written to logs, frontend assets or Git.
+The Rust engine handles compatible `/chat/completions` SSE directly and requires a valid termination marker; it defaults to 8 tool-call rounds, 4 foreground concurrent turns and a 120-second total timeout; desktop-enabled turns use 32 rounds and a timeout of at least 600 seconds. Tools include the authorized `memory_search` and optional `web_search`; Shell or local file execution is not exposed. Web and memory results are both treated as untrusted material. Model credentials and tool keys are never written to logs, frontend assets or Git.
 
 父插件 `aio-plugin-agent` 与记忆子插件 [aio-plugin-agent-memory](https://github.com/zjarlin/aio-plugin-agent-memory) 独立发布，以宿主桥调用而不共享数据库。后续子插件采用 `aio-plugin-agent-<功能名>` 命名。命令行笔记采集见 [CLI 指南](cli/README.md)。
 
@@ -119,3 +119,5 @@ Reference designs: [DeepSeek Harness](https://www.deepseek.com/harness/) treats 
 测试数据库必须是隔离的本机 PostgreSQL。浏览器验证包含桌面/移动端、新建、编辑、删除确认和溢出检查。
 
 Verification: `cargo test -p az-agent-server --lib`; `AIO_TEST_DATABASE_URL=... node scripts/test-skills.mjs`; after building the frontend, run `AIO_TEST_DATABASE_URL=... node scripts/test-skills-browser.mjs`. The test database must be an isolated local PostgreSQL. Browser verification covers desktop/mobile, create, edit, delete confirmation and overflow checks.
+
+桌面操作复用已配对 worker 与独立的本机授权。安装、观察凭据、截图协议及实际兼容性见 [桌面控制](docs/desktop-control.md)。

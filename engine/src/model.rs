@@ -18,6 +18,9 @@ pub struct RunState {
     pub pending: Vec<ToolCall>,
     pub rounds_left: u8,
     pub tokens: i64,
+    /// 尚未提交给模型的工具图片，随用户输入检查点一起保存。
+    #[serde(default)]
+    pub observations: Vec<Value>,
 }
 
 impl RunState {
@@ -27,6 +30,7 @@ impl RunState {
             pending: Vec::new(),
             rounds_left: 8,
             tokens: 0,
+            observations: Vec::new(),
         }
     }
     /// 把用户答案作为原工具调用的结果注入，已完成工具不重新执行。
@@ -56,6 +60,10 @@ impl std::error::Error for InputRequired {}
 pub trait Tool: Send + Sync {
     fn definition(&self) -> Value;
     async fn invoke(&self, arguments: Value) -> Result<Value>;
+    /// 由可信工具适配器提取图片并移除文本回执中的编码数据；普通工具默认仅返回文本。
+    fn take_images(&self, _result: &mut Value) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 #[derive(Default)]

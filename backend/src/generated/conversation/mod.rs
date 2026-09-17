@@ -27,3 +27,5 @@ mod swarm_tools;
 
 #[cfg(test)]
 mod swarm_tests;
+
+mod desktop_tools;

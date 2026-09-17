@@ -17,3 +17,5 @@ Memory 的 `greeting` 路由与保存、检索一样直接回复，记为 0 toke
 用户输入中断见 `user_input.rs`（加密检查点与恢复）、`input_tool.rs`（1 至 3 题）、`device_routing.rs`（用户确定目标）、`generation.rs`（暂停状态收集）。入口为 `/devices`、`PUT /conversations/{id}/device`、`POST /conversations/{id}/input`。完整行为与现有限制见 `../../../../../docs/device-orchestration.md`。
 
 蜂群入口见 `swarm_tools.rs`（发现/派发/等待/取消）、`swarm_store.rs`（会话关联、加密回执和归属验证）、`swarm_model.rs`（输入）。`GET /conversations/{id}/tasks` 和任务取消接口供结果窗口使用。完整边界见 `docs/swarm-execution.md`。
+
+`desktop_tools.rs` 使用独立的 `desktop.control` 授权，在同一设备任务通道中执行观察、点击、输入和结果回读。任务的 capability 随归属和加密结果一起持久化，等待及取消不混用工作区权限。图片由工具显式交给模型多模态消息；界面只展示最新一张截图，历史回执保留文字。详见 `docs/desktop-control.md`。

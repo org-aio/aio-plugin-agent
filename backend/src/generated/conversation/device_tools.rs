@@ -44,11 +44,12 @@ pub(super) fn broker(
     prompt: &str,
 ) -> Option<Arc<Broker>> {
     let gateway = core.config.gateway.as_ref()?;
-    if !gateway
-        .worker_capabilities
-        .iter()
-        .any(|c| matches!(c.as_str(), "desktop.open-app" | "workspace.execute"))
-    {
+    if !gateway.worker_capabilities.iter().any(|c| {
+        matches!(
+            c.as_str(),
+            "desktop.open-app" | "workspace.execute" | "desktop.control"
+        )
+    }) {
         return None;
     }
     Some(Arc::new(Broker {
