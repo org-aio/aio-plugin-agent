@@ -4,7 +4,7 @@
     {
       "repository": "aio-plugin-agent-memory",
       "feature": "memory",
-      "git": "https://github.com/zjarlin/aio-plugin-agent-memory.git"
+      "git": "https://github.com/org-aio/aio-plugin-agent-memory.git"
     }
   ]
 }

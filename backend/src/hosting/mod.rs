@@ -8,7 +8,19 @@ use crate::{
     transport::Ingress,
 };
 
-pub const MEMORY_SOURCE: &str = "https://github.com/zjarlin/aio-plugin-agent-memory.git";
+pub const MEMORY_SOURCE: &str = "https://github.com/org-aio/aio-plugin-agent-memory.git";
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn memory_source_matches_delivery_metadata() -> anyhow::Result<()> {
+        let manifest = include_str!("../../../aio-plugin.toml");
+        assert!(manifest.contains(&format!("services = [\"{}\"]", super::MEMORY_SOURCE)));
+        let family: serde_json::Value = serde_json::from_str(include_str!("../../../family.json"))?;
+        assert_eq!(family["children"][0]["git"], super::MEMORY_SOURCE);
+        Ok(())
+    }
+}
 
 pub fn load() -> Result<Option<(RuntimeConfig, Ingress)>> {
     let Some(path) = std::env::var_os("AIO_PLUGIN_CONFIG") else {
