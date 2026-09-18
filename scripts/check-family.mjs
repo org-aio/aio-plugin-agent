@@ -6,7 +6,7 @@ const names = new Set();
 for (const child of parent.children) {
   assert.match(child.feature, /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/);
   assert.equal(child.repository, `${parent.repository}-${child.feature}`);
-  assert.equal(new URL(child.git).pathname, `/zjarlin/${child.repository}.git`);
+  assert.equal(new URL(child.git).pathname, `/org-aio/${child.repository}.git`);
   assert(!names.has(child.repository));
   names.add(child.repository);
 }
