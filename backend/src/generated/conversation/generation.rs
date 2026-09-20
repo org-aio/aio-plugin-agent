@@ -302,6 +302,10 @@ pub(super) async fn run(
     {
         eprintln!("会话 {conversation} 最终保存失败，后续读取将恢复中断状态");
     }
+    // 只有成功完成且产生 token 的生成才计费；取消和失败不收费。
+    if status == "complete" {
+        super::metering::record_tokens(&core, &scope, assistant, tokens).await;
+    }
 }
 
 pub(super) async fn tools(

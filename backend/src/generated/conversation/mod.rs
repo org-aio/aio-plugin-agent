@@ -4,6 +4,7 @@ mod generation;
 mod intake;
 mod memory;
 mod memory_tools;
+mod metering;
 pub mod model;
 mod model_access;
 mod models;
