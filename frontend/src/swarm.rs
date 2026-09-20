@@ -13,7 +13,7 @@ use uuid::Uuid;
 pub fn SwarmTasks(conversation: Uuid) -> Element {
     let mut open = use_signal(|| false);
     rsx! {
-        Button { size:ButtonSize::Sm, variant:ButtonVariant::Outline, onclick:move |_|open.set(true), "蜂群任务" }
+        Button { r#type:"button", size:ButtonSize::Sm, variant:ButtonVariant::Ghost, onclick:move |_|open.set(true), "蜂群任务" }
         if open() { TaskDialog { key:"{conversation}", conversation, on_close:move |_|open.set(false) } }
     }
 }

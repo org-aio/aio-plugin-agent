@@ -5,7 +5,7 @@ use crate::{
 use az_agent_model::{Conversation, ModelListRequest, ModelSelection};
 use az_ui_components::{
     button::{Button, ButtonSize, ButtonVariant},
-    select::{Select, SelectItem},
+    select::{Select, SelectItem, SelectPlacement},
 };
 use dioxus::prelude::*;
 use serde_json::json;
@@ -93,6 +93,7 @@ pub fn ConversationModel() -> Element {
         div { class: "dx-conversation__model-selector",
             Select {
                 aria_label: "对话模型",
+                placement: SelectPlacement::Top,
                 value: selected,
                 options,
                 disabled: state.read().busy || state

@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "az-admin-shell-core"
 version = "2026.8.13"
-source = "git+https://github.com/zjarlin/dioxus-admin-workbench.git?rev=c51ef561b8a68545482dd56b235515cc9c8b30bc#c51ef561b8a68545482dd56b235515cc9c8b30bc"
+source = "git+https://github.com/zjarlin/dioxus-admin-workbench.git?rev=d1c82adf2582a2e7e85e44ebf7e5eb0b1f01b804#d1c82adf2582a2e7e85e44ebf7e5eb0b1f01b804"
 dependencies = [
  "anyhow",
  "convert_case 0.8.0",
@@ -210,6 +210,7 @@ dependencies = [
  "base64",
  "console_error_panic_hook",
  "dioxus",
+ "dioxus-icons",
  "gloo-timers",
  "js-sys",
  "serde",
@@ -270,7 +271,7 @@ dependencies = [
 [[package]]
 name = "az-ui-components"
 version = "2026.8.17"
-source = "git+https://github.com/zjarlin/dioxus-admin-workbench.git?rev=c51ef561b8a68545482dd56b235515cc9c8b30bc#c51ef561b8a68545482dd56b235515cc9c8b30bc"
+source = "git+https://github.com/zjarlin/dioxus-admin-workbench.git?rev=d1c82adf2582a2e7e85e44ebf7e5eb0b1f01b804#d1c82adf2582a2e7e85e44ebf7e5eb0b1f01b804"
 dependencies = [
  "az-admin-shell-core",
  "dioxus",

@@ -7,7 +7,7 @@ use az_ui_components::{
     button::{Button, ButtonSize, ButtonVariant},
     dialog::{Dialog, DialogTitle},
     input::Input,
-    select::{Select, SelectItem},
+    select::{Select, SelectItem, SelectPlacement},
 };
 use dioxus::prelude::*;
 use serde_json::{Value, json};
@@ -125,10 +125,12 @@ pub fn ConversationDevice() -> Element {
     }
     rsx! {
         div { class:"dx-conversation__model-selector",
-            Select { aria_label:"执行设备",value:selected,options,
+            Select { aria_label:"执行设备", placement: SelectPlacement::Top,value:selected,options,
                 disabled:state.read().busy || state.read().processing() || thread.as_ref().is_some_and(|t|t.pending_input.is_some()),
                 on_value_change:move |value:String| {
-                    if let Some(id)=state.peek().thread.as_ref().map(|t|t.conversation.id) {
+                    // 先释放只读借用，再由 run 更新忙碌状态。
+                    let conversation_id = state.peek().thread.as_ref().map(|t| t.conversation.id);
+                    if let Some(id) = conversation_id {
                         state::run(state,async move {
                             let worker=if value.is_empty() {None} else {Some(Uuid::parse_str(&value).map_err(|_|"设备 ID 无效")?)};
                             let conversation:Conversation=transport::request("PUT",&format!("/conversations/{id}/device"),json!({"workerId":worker})).await?;
