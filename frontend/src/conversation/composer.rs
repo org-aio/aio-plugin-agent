@@ -27,13 +27,15 @@ pub(super) fn Composer() -> Element {
             onkeydown: move |event: KeyboardEvent| {
                 if event.key() == Key::Escape { more_open.set(false); }
             },
+            crate::models::ModelShortcuts {}
+            super::router::RouterPanel {}
             form { class: "dx-conversation__composer",
                 onsubmit: move |e: FormEvent| {
                     e.prevent_default();
                     if !disabled { state::run(state, async move { state::send(state).await }); }
                 },
                 Textarea {
-                    aria_label: "发送消息", placeholder: "向智能体发送消息…", rows: "2",
+                    aria_label: "发送消息", title: "Enter 发送，Shift + Enter 换行", placeholder: "随心输入", rows: "2",
                     value: view.draft.clone(), disabled,
                     oncompositionstart: move |_| composing.set(true),
                     oncompositionend: move |_| composing.set(false),
@@ -68,7 +70,8 @@ pub(super) fn Composer() -> Element {
                             }
                         }
                     }
-                    crate::models::ConversationModel {}
+                    div { class: "dx-conversation__device-control", crate::user_input::ConversationDevice {} }
+                    div { class: "dx-conversation__model-control", crate::models::ConversationModel {} }
                     Button { class: "dx-conversation__send", r#type: "button", size: ButtonSize::Icon,
                         aria_label: if view.running() { "停止" } else { "发送" },
                         title: if view.running() { "停止生成" } else { "发送消息" },
@@ -92,11 +95,9 @@ pub(super) fn Composer() -> Element {
                 }
             }
             div { class: "dx-conversation__composer-footer",
-                crate::user_input::ConversationDevice {}
                 small { role: "status",
                     if awaiting { "等待回答后继续" }
                     else if view.processing() { "正在处理…" }
-                    else { "Shift + Enter 换行" }
                 }
             }
         }

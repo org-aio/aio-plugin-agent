@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 az-agent-model = { path = "../shared/rust" }
-az-ui-components = { git = "https://github.com/zjarlin/dioxus-admin-workbench.git", rev = "d1c82adf2582a2e7e85e44ebf7e5eb0b1f01b804" }
+az-ui-components = { git = "https://github.com/zjarlin/dioxus-admin-workbench.git", rev = "5889f4336ae98a77d25e439ad9d74ddcd5a7b8c4" }
 dioxus = { version = "=0.7.9", default-features = false, features = ["macro", "html", "signals", "hooks", "document", "web", "launch"] }
 serde.workspace = true
 serde_json.workspace = true

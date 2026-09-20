@@ -139,7 +139,7 @@ pub fn ConversationDevice() -> Element {
                     }
                 },
             }
-            Button {size:ButtonSize::Sm,variant:ButtonVariant::Ghost,aria_label:"刷新设备",onclick:move |_|devices.restart(),"↻"}
+            Button {r#type:"button",size:ButtonSize::Sm,variant:ButtonVariant::Ghost,aria_label:"刷新设备",onclick:move |_|devices.restart(),"↻"}
             if let Some(Err(error))=devices.read().as_ref() { small {role:"alert","{error}"} }
         }
     }

@@ -8,4 +8,4 @@
 
 `preview-memory.mjs` 启动本地真实双插件桥；`rehearse-memory.mjs` 只演练本地副本恢复。`check-family.mjs` 和 `check-sdk.mjs` 校验子插件归属与 SDK 来源。生产安装不执行作者脚本，不包含 Node 运行时。
 
-`preview-conversation-ui.mjs` / `npm run preview:ui` 启动仅本地的内存夹具，使用真实打包 Wasm 和正式 SDK 桥；不需要数据库或真实模型。`npm run test:ui` 验证会话工作区的桌面/手机、浅/深色、滚动边界、模型与设备选择、输入法、发送/停止、复制、新建和删除确认。截图与测量位于 `test-results/conversation-ui`。使用系统 Chrome 时设置 `AIO_UI_BROWSER_CHANNEL=chrome`；具体边界见 `docs/conversation-ui.md`。
+`preview-conversation-ui.mjs` / `npm run preview:ui` 启动仅本地的内存夹具，使用真实打包 Wasm 和正式 SDK 桥；不需要数据库或真实模型。`npm run test:ui` 验证 2009×1184 参考尺寸与桌面/手机、浅/深色、模型快捷条、路由能力状态、分组导航、环境信息、滚动边界、模型与设备选择、输入法、发送/停止、复制、新建和删除确认。截图与测量位于 `test-results/conversation-ui`。使用系统 Chrome 时设置 `AIO_UI_BROWSER_CHANNEL=chrome`；具体边界见 `docs/conversation-ui.md`。

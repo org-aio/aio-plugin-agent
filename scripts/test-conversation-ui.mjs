@@ -59,6 +59,18 @@ try {
           composer: rect(".dx-conversation__composer"),
           messages: rect(".dx-conversation__messages"),
           surface: getComputedStyle(root).backgroundColor,
+          sidebarWidth: root
+            .querySelector(".dx-conversation__history")
+            .getBoundingClientRect().width,
+          sidebarSurface: getComputedStyle(
+            root.querySelector(".dx-conversation__history"),
+          ).backgroundColor,
+          composerSurface: getComputedStyle(
+            root.querySelector(".dx-conversation__composer"),
+          ).backgroundColor,
+          device: rect(".dx-conversation__device-control"),
+          model: rect(".dx-conversation__model-control"),
+          router: rect(".dx-conversation__router"),
         };
       });
     assert(
@@ -79,6 +91,22 @@ try {
       measurements.height,
       `${label}: 工作区高度`,
     );
+    assert(
+      measurements.device.right <= measurements.model.x + 1,
+      `${label}: 模型与设备控件重叠`,
+    );
+    assert(
+      measurements.messages.bottom <= measurements.router.y + 1,
+      `${label}: 消息与路由面板重叠`,
+    );
+    if (label === "reference-desktop") {
+      assert.equal(measurements.sidebarWidth, 345);
+      assert.equal(measurements.sidebarSurface, "rgb(253, 253, 253)");
+      assert.equal(measurements.composerSurface, "rgb(255, 255, 255)");
+      assert.equal(measurements.composer.width, 752);
+      assert.equal(measurements.composer.x, 815);
+      assert.equal(measurements.composer.bottom, 1175);
+    }
     results.push({ label, ...measurements });
   }
   await geometry("desktop-empty");
@@ -96,6 +124,32 @@ try {
       c.path.endsWith("/model") &&
       c.body.model === "gpt-6-mini",
   );
+  await frame
+    .getByRole("button", { name: "切换模型 gpt-6 · 演示服务", exact: true })
+    .click();
+  await assertCall(
+    (c) =>
+      c.method === "PUT" &&
+      c.path.endsWith("/model") &&
+      c.body.model === "gpt-6",
+  );
+  await frame
+    .getByRole("button", { name: "刷新模型列表", exact: true })
+    .click();
+  await assertCall(
+    () => calls.filter((c) => c.path === "/providers/models").length >= 2,
+  );
+  assert.equal(
+    await frame.locator(".dx-conversation__router input:disabled").count(),
+    3,
+  );
+  assert.equal(
+    await frame.locator(".dx-conversation__router select:disabled").count(),
+    3,
+  );
+  await frame.locator(".dx-conversation__router > summary").click();
+  assert(!(await frame.locator(".dx-conversation__router-panel").isVisible()));
+  await frame.locator(".dx-conversation__router > summary").click();
   await frame.getByRole("button", { name: "执行设备", exact: true }).click();
   await frame
     .getByRole("option", { name: "本机 · macOS · 在线", exact: true })
@@ -130,6 +184,27 @@ try {
   await frame.getByRole("heading", { name: "1. 明确当前目标" }).waitFor();
   await geometry("desktop-thread");
   await page.screenshot({ path: `${directory}/desktop-thread.png` });
+  await frame.getByRole("button", { name: "搜索对话", exact: true }).click();
+  await page.setViewportSize({ width: 2009, height: 1184 });
+  await frame.getByRole("button", { name: "环境信息", exact: true }).click();
+  await frame.getByRole("complementary", { name: "环境信息" }).waitFor();
+  await geometry("reference-desktop");
+  await page.screenshot({ path: `${directory}/reference-desktop.png` });
+  await frame
+    .getByRole("button", { name: "关闭环境信息", exact: true })
+    .click();
+  assert(
+    !(await frame.getByRole("complementary", { name: "环境信息" }).count()),
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await frame.getByRole("button", { name: "搜索对话", exact: true }).click();
+  await frame.locator(".dx-conversation__history-group > summary").click();
+  assert(
+    !(await frame
+      .getByRole("button", { name: "为项目梳理下一步计划", exact: true })
+      .isVisible()),
+  );
+  await frame.locator(".dx-conversation__history-group > summary").click();
   await frame.getByRole("button", { name: "复制回复", exact: true }).click();
   await frame
     .getByRole("button", { name: "已复制回复", exact: true })
@@ -219,6 +294,18 @@ try {
   await page.emulateMedia({ colorScheme: "light" });
   await geometry("mobile-light");
   await page.screenshot({ path: `${directory}/mobile-light.png` });
+  for (const name of ["对话模型", "执行设备"]) {
+    await frame.getByRole("button", { name, exact: true }).click();
+    const menu = await frame.getByRole("listbox").boundingBox();
+    assert(
+      menu.x >= 0 && menu.x + menu.width <= 390,
+      `${name}: 手机下拉菜单越界`,
+    );
+    await page.screenshot({
+      path: `${directory}/mobile-${name === "对话模型" ? "model" : "device"}-menu.png`,
+    });
+    await page.keyboard.press("Escape");
+  }
   await frame
     .getByRole("button", { name: "新对话", exact: true })
     .last()
@@ -238,6 +325,10 @@ try {
   );
   await geometry("mobile-empty");
   await page.screenshot({ path: `${directory}/mobile-empty.png` });
+  await page.setViewportSize({ width: 390, height: 568 });
+  await geometry("mobile-compact-empty");
+  await page.screenshot({ path: `${directory}/mobile-compact-empty.png` });
+  await page.setViewportSize({ width: 390, height: 844 });
   await frame
     .getByRole("button", { name: "切换会话列表", exact: true })
     .click();
@@ -259,7 +350,7 @@ try {
     ),
   );
   console.log(
-    "PASS: desktop/mobile, light/dark, model/device persistence, search, copy, sidebar, IME, send/stop, new conversation and delete confirmation",
+    "PASS: reference geometry, desktop/mobile, light/dark, shortcuts, unavailable router controls, environment panel, grouped history, model/device persistence, mobile menus, copy, IME, send/stop, new conversation and delete confirmation",
   );
 } finally {
   if (errors.length) console.error(errors);
