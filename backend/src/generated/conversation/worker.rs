@@ -1,6 +1,6 @@
 use super::{generation, memory, model::*, model_access, service_impl::Core, util};
 use crate::runtime;
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sqlx::Row;
 use std::{
@@ -323,5 +323,58 @@ async fn compile(core: &Arc<Core>, scope: &Scope, task: &Value) -> Result<Value>
     })
     .await
     .context("整理超时")??;
-    serde_json::from_str(&output).context("整理结果不是有效 JSON")
+    parse_compilation_result(&output)
+}
+
+fn parse_compilation_result(output: &str) -> Result<Value> {
+    if let Ok(value) = serde_json::from_str::<Value>(output) {
+        ensure!(value.is_object(), "整理结果必须是 JSON 对象");
+        return Ok(value);
+    }
+
+    let trimmed = output.trim();
+    let body = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```JSON"))
+        .and_then(|value| value.strip_suffix("```"))
+        .map(str::trim)
+        .unwrap_or(trimmed);
+    if let Ok(value) = serde_json::from_str::<Value>(body) {
+        ensure!(value.is_object(), "整理结果必须是 JSON 对象");
+        return Ok(value);
+    }
+
+    let start = trimmed.find('{').context("整理结果不是有效 JSON")?;
+    let end = trimmed.rfind('}').context("整理结果不是有效 JSON")?;
+    ensure!(start < end, "整理结果不是有效 JSON");
+    let value: Value =
+        serde_json::from_str(&trimmed[start..=end]).context("整理结果不是有效 JSON")?;
+    if !value.is_object() {
+        bail!("整理结果必须是 JSON 对象");
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_compilation_result;
+
+    #[test]
+    fn accepts_plain_json() {
+        assert!(parse_compilation_result(r#"{"entries":[],"relations":[]}"#).is_ok());
+    }
+
+    #[test]
+    fn accepts_fenced_json_and_model_prefix() {
+        assert!(
+            parse_compilation_result("推理完成。```json\n{\"entries\":[],\"relations\":[]}\n```")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_non_object_json() {
+        assert!(parse_compilation_result("[1, 2, 3]").is_err());
+        assert!(parse_compilation_result("这不是 JSON").is_err());
+    }
 }
