@@ -98,6 +98,13 @@ fn select_model(mut state: Signal<AgentState>, value: String) {
                 provider_id: None,
                 model: None,
             }
+        } else if value.starts_with("auto:") {
+            // Auto 模式：保留 provider，model 留空由后端自动选择
+            let provider: Uuid = Uuid::parse_str(&value[5..]).map_err(|_| "模型选择无效")?;
+            ModelSelection {
+                provider_id: Some(provider),
+                model: None,
+            }
         } else {
             let (provider, model): (Uuid, String) =
                 serde_json::from_str(&value).map_err(|_| "模型选择无效")?;
@@ -126,7 +133,16 @@ pub fn ConversationModel() -> Element {
     let view = state.read().clone();
     let current = view.thread.as_ref().map(|thread| &thread.conversation);
     let selected = selected_model(&view);
+    // Auto 模式：保留 provider，由后端自动选择默认模型
+    let auto_value = if let Some(p) = view.thread.as_ref().and_then(|t| t.conversation.provider_id) {
+        Some(format!("auto:{}", p))
+    } else {
+        None
+    };
     let mut options = vec![SelectItem::new("", "跟随空间模型")];
+    if let Some(ref v) = auto_value {
+        options.insert(1, SelectItem::new(v, "Auto · 自动选模"));
+    }
     if let Some((loaded, _)) = catalog.read().as_ref() {
         options.extend(loaded.clone());
     }

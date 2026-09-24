@@ -1,7 +1,6 @@
 mod composer;
 mod environment;
 mod message;
-mod router;
 mod sidebar;
 
 use crate::state::{AgentState, Dialog};

@@ -28,7 +28,6 @@ pub(super) fn Composer() -> Element {
                 if event.key() == Key::Escape { more_open.set(false); }
             },
             crate::models::ModelShortcuts {}
-            super::router::RouterPanel {}
             form { class: "dx-conversation__composer",
                 onsubmit: move |e: FormEvent| {
                     e.prevent_default();
