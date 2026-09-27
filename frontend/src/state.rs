@@ -53,14 +53,20 @@ impl AgentState {
     }
     pub fn processing(&self) -> bool {
         self.thread.as_ref().is_some_and(|t| {
-            t.messages.iter().any(|m| {
-                matches!(m.status.as_str(), "queued" | "generating")
-                    || (matches!(m.memory_status.as_deref(), Some("pending" | "processing"))
-                        && self.spaces.iter().any(|space| {
-                            Some(&space.id) == t.conversation.space_id.as_ref()
-                                && space.model_binding.is_some()
-                        }))
-            })
+            t.messages
+                .iter()
+                .any(|m| matches!(m.status.as_str(), "queued" | "generating"))
+        })
+    }
+    // 记忆整理只驱动后台刷新，不占用对话输入和发送。
+    pub fn memory_processing(&self) -> bool {
+        self.thread.as_ref().is_some_and(|t| {
+            self.spaces.iter().any(|space| {
+                Some(&space.id) == t.conversation.space_id.as_ref() && space.model_binding.is_some()
+            }) && t
+                .messages
+                .iter()
+                .any(|m| matches!(m.memory_status.as_deref(), Some("pending" | "processing")))
         })
     }
 }
@@ -136,6 +142,9 @@ pub async fn select(mut state: Signal<AgentState>, id: Uuid) -> Result<(), Strin
     Ok(())
 }
 pub async fn send(mut state: Signal<AgentState>) -> Result<(), String> {
+    if state.peek().processing() {
+        return Err("请等待当前消息处理完成".into());
+    }
     let Some(id) = state.peek().thread.as_ref().map(|t| t.conversation.id) else {
         return Ok(());
     };

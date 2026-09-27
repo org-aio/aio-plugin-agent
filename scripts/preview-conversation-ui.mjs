@@ -36,8 +36,8 @@ function message(role, content, status = "complete") {
     activatedNodeIds: [],
   };
 }
-function fixtures() {
-  const threads = [
+function fixtures(options) {
+  const defaultThreads = [
     { conversation: conversation("新对话"), messages: [], pendingInput: null },
     {
       conversation: conversation("为项目梳理下一步计划"),
@@ -58,6 +58,8 @@ function fixtures() {
       pendingInput: null,
     },
   ];
+  const threads = structuredClone(options.threads ?? defaultThreads);
+  const spaces = structuredClone(options.spaces ?? []);
   const calls = [];
   const deadlines = new Map();
   return {
@@ -77,10 +79,17 @@ function fixtures() {
             },
           ],
           maxPromptChars: 24000,
-          memoryAvailable: false,
+          memoryAvailable: spaces.length > 0,
           webSearch: { enabled: false, hasSecret: false },
         };
       if (path === "/providers/models") return [model, "gpt-6-mini"];
+      if (
+        path === "/memory" &&
+        body.method === "GET" &&
+        body.path === "/spaces"
+      ) {
+        return spaces;
+      }
       if (path === "/devices")
         return [
           { id: deviceId, label: "本机", platform: "macOS", status: "online" },
@@ -140,8 +149,8 @@ function fixtures() {
   };
 }
 
-export async function startConversationPreview(port = 4196) {
-  const data = fixtures();
+export async function startConversationPreview(port = 4196, options = {}) {
+  const data = fixtures(options);
   const assets = resolve("dist/frontend");
   let origin;
   const server = createServer(async (req, res) => {

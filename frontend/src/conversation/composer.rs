@@ -21,7 +21,7 @@ pub(super) fn Composer() -> Element {
         .thread
         .as_ref()
         .is_some_and(|t| t.pending_input.is_some());
-    let disabled = view.busy || view.processing() || awaiting;
+    let send_disabled = view.busy || view.processing() || awaiting;
     rsx! {
         div { class: "dx-conversation__composer-wrap",
             onkeydown: move |event: KeyboardEvent| {
@@ -31,18 +31,18 @@ pub(super) fn Composer() -> Element {
             form { class: "dx-conversation__composer",
                 onsubmit: move |e: FormEvent| {
                     e.prevent_default();
-                    if !disabled { state::run(state, async move { state::send(state).await }); }
+                    if !send_disabled { state::run(state, async move { state::send(state).await }); }
                 },
                 Textarea {
                     aria_label: "发送消息", title: "Enter 发送，Shift + Enter 换行", placeholder: "随心输入", rows: "2",
-                    value: view.draft.clone(), disabled,
+                    value: view.draft.clone(), disabled: view.busy,
                     oncompositionstart: move |_| composing.set(true),
                     oncompositionend: move |_| composing.set(false),
                     oninput: move |e: FormEvent| state.write().draft = e.value(),
                     onkeydown: move |e: KeyboardEvent| {
                         if e.key() == Key::Enter && !e.modifiers().shift() && !composing() && !e.is_composing() {
                             e.prevent_default();
-                            if !disabled { state::run(state, async move { state::send(state).await }); }
+                            if !send_disabled { state::run(state, async move { state::send(state).await }); }
                         }
                     },
                 }
@@ -96,7 +96,9 @@ pub(super) fn Composer() -> Element {
             div { class: "dx-conversation__composer-footer",
                 small { role: "status",
                     if awaiting { "等待回答后继续" }
-                    else if view.processing() { "正在处理…" }
+                    else if view.running() { "正在生成回复…" }
+                    else if view.processing() { "正在保存消息…" }
+                    else if view.memory_processing() { "正在整理记忆…" }
                 }
             }
         }
