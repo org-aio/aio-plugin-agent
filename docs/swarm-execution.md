@@ -23,6 +23,7 @@ flowchart TD
 ## 已实现协议
 
 - `device_list` 发现当前账号已获授权的设备及能力。
+- 会话可选择执行设备和设备本机已授权的本地项目。项目由设备端系统目录选择器登记；Agent 只接收逻辑 ID，不接收绝对路径。绑定后 `swarm_dispatch` 只能派发到该设备的该项目。
 - `swarm_dispatch` 每次 1 至 4 组，每组一个设备，先 `input:{action:"describe"}` 读取工作区逻辑 ID 与允许的命令，再用 `input:{action:"run",jobs:[...]}` 执行最多 8 项独立作业。所有目标在派发前完成校验；模型提供的设备名必须来自当前用户消息或会话已选设备。未明确目标的多设备情形使用既有持久化选择问题。
 - 每台 worker 的单批最多并行 3 个不重叠的真实工作区；相同目录、别名、父子目录串行；输入顺序决定回执顺序。现有设备领取协议一次领取一个批次，不破坏租约与崩溃去重机制。多个设备的批次可以并行。
 - `swarm_wait` 每次查询最多 4 个会话任务，最多等待 20 秒；终态回执加密缓存，重新加载或 Agent 重启后仍可查询。重复派发相同回复、设备、输入会复用同一 ID；未知结果不自动重放。
@@ -74,7 +75,7 @@ flowchart TD
 
 ## 部署核对与本机实例
 
-宿主和独立的 `aio-delivery` 打包进程都必须使用包含 `workspace.execute` 的 Bundle 校验器；只更新宿主会使自动构建在打包阶段报“process 设备能力未开放”。宿主、插件清单和 `AIO_PROCESS_WORKER_CAPABILITIES` 的声明均须匹配。失败构建保留旧活动插件，不能把 Git 推送当成已激活。
+宿主和独立的 `aio-delivery` 打包进程都必须使用包含 `workspace.execute`、`workspace.manage` 的 Bundle 校验器；只更新宿主会使自动构建在打包阶段报“process 设备能力未开放”。宿主、插件清单和 `AIO_PROCESS_WORKER_CAPABILITIES` 的声明均须匹配。失败构建保留旧活动插件，不能把 Git 推送当成已激活。
 
 2026-09-16 已用临时配对 Mac 经 `https://aio.addzero.site` 的真实出站 HTTPS 队列完成工作区发现、两项目 Git/读取/构建/HTTP 200 验收，保留退出码 7 的失败回执，并验证远程取消清理进程、撤销能力。验收设备随后撤销。实际 Mac worker 0.7.1 已登记 `aio-space`、`aio-agent`、`aio-platform`：前两者具有命名项目检查和文件写入授权，最后一个只读。真实 worker 执行器运行 Space typecheck 与 Agent 测试均退出 0；Cargo 的 rustup 调用别名和 HOME 已覆盖专项回归。
 

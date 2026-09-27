@@ -92,8 +92,16 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
         )
         .route("/devices", get(controller::devices))
         .route(
+            "/devices/{worker}/workspaces",
+            get(controller::workspaces).post(controller::add_workspace),
+        )
+        .route(
             "/conversations/{id}/device",
             axum::routing::put(controller::select_device),
+        )
+        .route(
+            "/conversations/{id}/workspace",
+            axum::routing::put(controller::select_workspace),
         )
         .route("/conversations/{id}/input", post(controller::answer_input))
         .route("/conversations/{id}/messages", post(controller::send))

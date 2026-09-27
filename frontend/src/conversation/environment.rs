@@ -37,6 +37,11 @@ pub(super) fn EnvironmentPanel(on_close: EventHandler<MouseEvent>) -> Element {
                 dd {
                     if conversation.is_some_and(|c| c.worker_id.is_some()) { "已指定设备" } else { "自动选择 · 多台时询问" }
                 }
+                dt { "本地项目" }
+                dd {
+                    if let Some(workspace)=conversation.and_then(|c|c.workspace_id.as_deref()) { "{workspace}" }
+                    else { "未指定 · 单项目时自动选择" }
+                }
                 dt { "对话状态" }
                 dd {
                     if view.thread.as_ref().is_some_and(|t| t.pending_input.is_some()) { "等待回答" }

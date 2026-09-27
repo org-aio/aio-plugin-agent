@@ -37,11 +37,19 @@ pub trait AgentService: super::super::skills::service::SkillService + Send + Syn
         answer: InputAnswer,
     ) -> ServiceResult<Thread>;
     async fn devices(&self, scope: &Scope) -> ServiceResult<serde_json::Value>;
+    async fn workspaces(&self, scope: &Scope, worker_id: Uuid) -> ServiceResult<Vec<Workspace>>;
+    async fn add_workspace(&self, scope: &Scope, worker_id: Uuid) -> ServiceResult<Workspace>;
     async fn select_device(
         &self,
         scope: &Scope,
         id: Uuid,
         selection: DeviceSelection,
+    ) -> ServiceResult<Conversation>;
+    async fn select_workspace(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        selection: WorkspaceSelection,
     ) -> ServiceResult<Conversation>;
     async fn swarm_tasks(&self, scope: &Scope, id: Uuid) -> ServiceResult<Vec<SwarmTask>>;
     async fn cancel_swarm_task(&self, scope: &Scope, id: Uuid, task: Uuid) -> ServiceResult<()>;

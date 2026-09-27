@@ -1,4 +1,4 @@
-use super::{model::*, service_impl::Core, store, util};
+use super::{device_tools, model::*, service_impl::Core, store, util};
 use az_agent_engine::{InputRequired, RunState};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -159,6 +159,7 @@ pub(super) async fn answer(
         scope,
         assistant,
         selected,
+        thread.conversation.workspace_id.clone(),
         &checkpoint.prompt,
         thread.conversation.space_id,
         message.source_id.clone(),
@@ -261,6 +262,182 @@ pub(super) async fn select_device(
     sqlx::query("UPDATE agent_conversations SET worker_id=$2 WHERE id=$1")
         .bind(conversation)
         .bind(selection.worker_id)
+        .execute(&core.pool)
+        .await?;
+    sqlx::query("UPDATE agent_conversations SET workspace_id=NULL WHERE id=$1")
+        .bind(conversation)
+        .execute(&core.pool)
+        .await?;
+    store::owned(&core.pool, scope, conversation).await
+}
+
+fn workspace_value(value: &Value) -> ServiceResult<Vec<Workspace>> {
+    let items = value
+        .get("workspaces")
+        .and_then(Value::as_array)
+        .ok_or_else(|| bad("设备项目列表格式无效"))?;
+    items
+        .iter()
+        .map(|item| {
+            let id = item["id"].as_str().ok_or_else(|| bad("项目 ID 无效"))?;
+            if id.is_empty() || id.len() > 64 {
+                return Err(bad("项目 ID 无效"));
+            }
+            Ok(Workspace {
+                id: id.into(),
+                label: item["label"].as_str().unwrap_or(id).into(),
+                operations: item["operations"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect(),
+                commands: item["commands"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect(),
+            })
+        })
+        .collect()
+}
+
+async fn workspace_request(
+    core: &Core,
+    scope: &Scope,
+    worker_id: Uuid,
+    capability: &str,
+    input: Value,
+) -> ServiceResult<Value> {
+    let broker = device_tools::broker(core, scope, Uuid::nil(), Some(worker_id), "")
+        .ok_or_else(|| bad("当前未启用设备工作区能力"))?;
+    let id = Uuid::new_v4();
+    let mut task = broker
+        .request_timeout(
+            json!({
+                "operation":"submit",
+                "capability":capability,
+                "workerId":worker_id,
+                "requestId":id,
+                "input":input,
+            }),
+            std::time::Duration::from_secs(120),
+        )
+        .await
+        .map_err(|_| bad("设备项目操作未授权或设备离线"))?;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+    loop {
+        if task["id"] != id.to_string() {
+            return Err(bad("设备返回了不匹配的项目任务"));
+        }
+        match task["state"].as_str() {
+            Some("complete") => return Ok(task["result"].clone()),
+            Some("failed" | "cancelled" | "interrupted") => {
+                return Err(bad(task["error"].as_str().unwrap_or("设备项目操作失败")));
+            }
+            Some("queued" | "running" | "pending" | "unconfirmed") => {
+                if tokio::time::Instant::now() >= deadline {
+                    return Err(conflict("等待设备项目操作超时，请刷新项目列表"));
+                }
+            }
+            _ => return Err(bad("设备项目任务状态无效")),
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            return Err(conflict("等待设备项目操作超时，请刷新项目列表"));
+        }
+        task = broker
+            .request_timeout(json!({"operation":"task","taskId":id}), remaining)
+            .await
+            .map_err(|_| bad("无法读取设备项目任务状态"))?;
+    }
+}
+
+pub(super) async fn workspaces(
+    core: &Core,
+    scope: &Scope,
+    worker_id: Uuid,
+) -> ServiceResult<Vec<Workspace>> {
+    let value = workspace_request(
+        core,
+        scope,
+        worker_id,
+        "workspace.execute",
+        json!({"action":"describe"}),
+    )
+    .await
+    .unwrap_or_else(|_| json!({"workspaces":[]}));
+    workspace_value(&value)
+}
+
+pub(super) async fn add_workspace(
+    core: &Core,
+    scope: &Scope,
+    worker_id: Uuid,
+) -> ServiceResult<Workspace> {
+    let value = workspace_request(
+        core,
+        scope,
+        worker_id,
+        "workspace.manage",
+        json!({"action":"add"}),
+    )
+    .await?;
+    let item = value.get("workspace").unwrap_or(&value);
+    let id = item["id"]
+        .as_str()
+        .ok_or_else(|| bad("设备没有返回已登记项目"))?;
+    if id.is_empty() || id.len() > 64 {
+        return Err(bad("设备返回的项目 ID 无效"));
+    }
+    Ok(Workspace {
+        id: id.into(),
+        label: item["label"].as_str().unwrap_or(id).into(),
+        operations: item["operations"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect(),
+        commands: item["commands"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect(),
+    })
+}
+
+pub(super) async fn select_workspace(
+    core: &Core,
+    scope: &Scope,
+    conversation: Uuid,
+    selection: WorkspaceSelection,
+) -> ServiceResult<Conversation> {
+    let current = store::owned(&core.pool, scope, conversation).await?;
+    let jobs = core.jobs.lock().await;
+    if jobs.contains_key(&conversation) {
+        return Err(conflict("请先停止当前任务"));
+    }
+    if pending(core, scope, conversation).await?.is_some() {
+        return Err(conflict("请回答或取消当前问题"));
+    }
+    let worker_id = current.worker_id.ok_or_else(|| bad("请先选择执行设备"))?;
+    if let Some(id) = selection.workspace_id.as_deref() {
+        let available = workspaces(core, scope, worker_id).await?;
+        if !available.iter().any(|workspace| workspace.id == id) {
+            return Err(missing());
+        }
+    }
+    sqlx::query("UPDATE agent_conversations SET workspace_id=$2 WHERE id=$1")
+        .bind(conversation)
+        .bind(selection.workspace_id)
         .execute(&core.pool)
         .await?;
     store::owned(&core.pool, scope, conversation).await

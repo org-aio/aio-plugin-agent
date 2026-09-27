@@ -139,12 +139,14 @@ async fn swarm_dispatch_is_scoped_concurrent_durable_and_cancellable() -> Result
         scope.clone(),
         assistant,
         None,
+        None,
         "在 Mac mini 和 MacBook 检查项目",
     );
     let ambiguous = swarm_tools::tools(
         service.core.clone(),
         scope.clone(),
         assistant,
+        None,
         None,
         "检查项目",
     );

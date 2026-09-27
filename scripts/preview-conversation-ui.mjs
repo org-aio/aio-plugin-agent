@@ -9,6 +9,12 @@ const providerId = "11111111-1111-4111-8111-111111111111";
 const deviceId = "22222222-2222-4222-8222-222222222222";
 const model = "gpt-6";
 const endpoint = "https://example.invalid/v1";
+const demoWorkspace = {
+  id: "demo-project",
+  label: "demo-project",
+  operations: ["git.status", "git.diff", "git.log", "fs.read", "fs.write"],
+  commands: ["build", "test"],
+};
 function conversation(title) {
   return {
     id: randomUUID(),
@@ -17,6 +23,7 @@ function conversation(title) {
     model,
     spaceId: null,
     workerId: null,
+    workspaceId: null,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -36,9 +43,13 @@ function message(role, content, status = "complete") {
     activatedNodeIds: [],
   };
 }
-function fixtures() {
-  const threads = [
-    { conversation: conversation("新对话"), messages: [], pendingInput: null },
+function fixtures(options) {
+  const defaultThreads = [
+    {
+      conversation: conversation("新对话"),
+      messages: [],
+      pendingInput: null,
+    },
     {
       conversation: conversation("为项目梳理下一步计划"),
       messages: [
@@ -58,6 +69,8 @@ function fixtures() {
       pendingInput: null,
     },
   ];
+  const threads = structuredClone(options.threads ?? defaultThreads);
+  const spaces = structuredClone(options.spaces ?? []);
   const calls = [];
   const deadlines = new Map();
   return {
@@ -77,14 +90,25 @@ function fixtures() {
             },
           ],
           maxPromptChars: 24000,
-          memoryAvailable: false,
+          memoryAvailable: spaces.length > 0,
           webSearch: { enabled: false, hasSecret: false },
         };
       if (path === "/providers/models") return [model, "gpt-6-mini"];
+      if (
+        path === "/memory" &&
+        body.method === "GET" &&
+        body.path === "/spaces"
+      ) {
+        return spaces;
+      }
       if (path === "/devices")
         return [
           { id: deviceId, label: "本机", platform: "macOS", status: "online" },
         ];
+      if (path === `/devices/${deviceId}/workspaces`) {
+        if (method === "POST") return demoWorkspace;
+        return [demoWorkspace];
+      }
       if (path === "/conversations") {
         if (method === "GET") return threads.map((t) => t.conversation);
         const created = {
@@ -108,6 +132,11 @@ function fixtures() {
       }
       if (action === "device") {
         thread.conversation.workerId = body.workerId;
+        thread.conversation.workspaceId = null;
+        return thread.conversation;
+      }
+      if (action === "workspace") {
+        thread.conversation.workspaceId = body.workspaceId;
         return thread.conversation;
       }
       if (action === "messages") {
@@ -140,8 +169,8 @@ function fixtures() {
   };
 }
 
-export async function startConversationPreview(port = 4196) {
-  const data = fixtures();
+export async function startConversationPreview(port = 4196, options = {}) {
+  const data = fixtures(options);
   const assets = resolve("dist/frontend");
   let origin;
   const server = createServer(async (req, res) => {

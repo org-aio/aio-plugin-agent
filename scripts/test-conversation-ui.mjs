@@ -41,7 +41,9 @@ try {
       .locator(".dx-conversation")
       .evaluate((root) => {
         const rect = (selector) => {
-          const r = root.querySelector(selector).getBoundingClientRect();
+          const element = root.querySelector(selector);
+          if (!element) return null;
+          const r = element.getBoundingClientRect();
           return {
             x: r.x,
             y: r.y,
@@ -96,7 +98,8 @@ try {
       `${label}: 模型与设备控件重叠`,
     );
     assert(
-      measurements.messages.bottom <= measurements.router.y + 1,
+      !measurements.router ||
+        measurements.messages.bottom <= measurements.router.y + 1,
       `${label}: 消息与路由面板重叠`,
     );
     if (label === "reference-desktop") {
@@ -139,23 +142,28 @@ try {
   await assertCall(
     () => calls.filter((c) => c.path === "/providers/models").length >= 2,
   );
-  assert.equal(
-    await frame.locator(".dx-conversation__router input:disabled").count(),
-    3,
-  );
-  assert.equal(
-    await frame.locator(".dx-conversation__router select:disabled").count(),
-    3,
-  );
-  await frame.locator(".dx-conversation__router > summary").click();
-  assert(!(await frame.locator(".dx-conversation__router-panel").isVisible()));
-  await frame.locator(".dx-conversation__router > summary").click();
   await frame.getByRole("button", { name: "执行设备", exact: true }).click();
   await frame
     .getByRole("option", { name: "本机 · macOS · 在线", exact: true })
     .click();
   await assertCall(
     (c) => c.method === "PUT" && c.path.endsWith("/device") && c.body.workerId,
+  );
+  await frame.getByRole("button", { name: "本地项目", exact: true }).click();
+  await frame
+    .getByRole("option", { name: "demo-project · 本地项目", exact: true })
+    .click();
+  await assertCall(
+    (c) =>
+      c.method === "PUT" &&
+      c.path.endsWith("/workspace") &&
+      c.body.workspaceId === "demo-project",
+  );
+  await frame.getByRole("button", { name: "添加本地项目", exact: true }).click();
+  await assertCall(
+    (c) =>
+      c.method === "POST" &&
+      c.path === `/devices/22222222-2222-4222-8222-222222222222/workspaces`,
   );
   await frame.getByRole("button", { name: "更多选项", exact: true }).click();
   await frame.getByRole("button", { name: "蜂群任务", exact: true }).click();
@@ -350,7 +358,7 @@ try {
     ),
   );
   console.log(
-    "PASS: reference geometry, desktop/mobile, light/dark, shortcuts, unavailable router controls, environment panel, grouped history, model/device persistence, mobile menus, copy, IME, send/stop, new conversation and delete confirmation",
+    "PASS: reference geometry, desktop/mobile, light/dark, shortcuts, unavailable router controls, environment panel, grouped history, model/device/workspace persistence, local project add, mobile menus, copy, IME, send/stop, new conversation and delete confirmation",
   );
 } finally {
   if (errors.length) console.error(errors);

@@ -51,6 +51,7 @@ pub struct ModelSelection {
 #[serde(rename_all = "camelCase")]
 pub struct Conversation {
     pub worker_id: Option<Uuid>,
+    pub workspace_id: Option<String>,
     pub model: Option<String>,
     pub id: Uuid,
     pub title: String,
@@ -97,6 +98,21 @@ pub struct ConversationDraft {
     pub provider_id: Option<Uuid>,
     pub title: String,
     pub space_id: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WorkspaceSelection {
+    pub workspace_id: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Workspace {
+    pub id: String,
+    pub label: String,
+    pub operations: Vec<String>,
+    pub commands: Vec<String>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

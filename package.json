@@ -8,7 +8,8 @@
     "test:browser": "node scripts/test-browser.mjs",
     "test:runtime": "cargo test -p az-agent-engine",
     "preview:ui": "node scripts/preview-conversation-ui.mjs",
-    "test:ui": "node scripts/test-conversation-ui.mjs"
+    "test:ui": "node scripts/test-conversation-ui.mjs",
+    "test:processing": "node scripts/test-conversation-processing.mjs"
   },
   "devDependencies": {
     "parse5": "8.0.0",

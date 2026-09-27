@@ -17,6 +17,7 @@ pub(super) fn tools(
     scope: Scope,
     assistant: Uuid,
     selected: Option<Uuid>,
+    workspace: Option<String>,
     prompt: &str,
 ) -> Vec<Arc<dyn Tool>> {
     if !core
@@ -35,6 +36,7 @@ pub(super) fn tools(
         scope,
         assistant,
         selected,
+        workspace,
         prompt: prompt.into(),
         broker,
     });
@@ -49,6 +51,7 @@ struct ContextData {
     scope: Scope,
     assistant: Uuid,
     selected: Option<Uuid>,
+    workspace: Option<String>,
     prompt: String,
     broker: Arc<device_tools::Broker>,
 }
@@ -116,7 +119,18 @@ impl Tool for DispatchTool {
     }
     async fn invoke(&self, arguments: Value) -> Result<Value> {
         let context = &self.0;
-        let request: Dispatch = serde_json::from_value(arguments)?;
+        let mut request: Dispatch = serde_json::from_value(arguments)?;
+        if let Some(workspace) = context.workspace.as_deref() {
+            for group in &mut request.groups {
+                ensure!(
+                    group.input["action"] != "run"
+                        || group.input["jobs"].as_array().is_some_and(|jobs| jobs
+                            .iter()
+                            .all(|job| job["workspace"] == workspace)),
+                    "任务工作区与会话绑定项目不一致"
+                );
+            }
+        }
         ensure!(
             !request.groups.is_empty() && request.groups.len() <= 4,
             "每次派发 1 至 4 组任务"

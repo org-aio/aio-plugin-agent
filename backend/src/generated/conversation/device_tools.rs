@@ -47,7 +47,7 @@ pub(super) fn broker(
     if !gateway.worker_capabilities.iter().any(|c| {
         matches!(
             c.as_str(),
-            "desktop.open-app" | "workspace.execute" | "desktop.control"
+            "desktop.open-app" | "workspace.execute" | "workspace.manage" | "desktop.control"
         )
     }) {
         return None;
@@ -78,7 +78,15 @@ pub(super) struct Broker {
 }
 
 impl Broker {
-    pub(super) async fn request(&self, mut body: Value) -> Result<Value> {
+    pub(super) async fn request(&self, body: Value) -> Result<Value> {
+        self.request_timeout(body, Duration::from_secs(10)).await
+    }
+
+    pub(super) async fn request_timeout(
+        &self,
+        mut body: Value,
+        timeout: Duration,
+    ) -> Result<Value> {
         // 用户范围来自当前宿主调用上下文，不允许模型覆盖。
         body["tenantId"] = json!(self.tenant);
         body["userId"] = json!(self.user);
@@ -86,7 +94,7 @@ impl Broker {
             .client
             .post(&self.endpoint)
             .header("x-aio-token", &self.token)
-            .timeout(Duration::from_secs(10))
+            .timeout(timeout)
             .json(&body)
             .send()
             .await?;
@@ -124,11 +132,24 @@ impl Tool for List {
             arguments.as_object().is_some_and(|v| v.is_empty()),
             "设备列表不接受参数"
         );
-        let devices = self
+        let mut devices = self
             .0
             .request(json!({"operation":"list","capability":"*"}))
             .await?;
         ensure!(devices.is_array(), "设备列表格式无效");
+        if let Some(items) = devices.as_array_mut() {
+            for device in items {
+                let selected = self
+                    .0
+                    .selected
+                    .is_some_and(|id| device["id"] == id.to_string());
+                if let Some(object) = device.as_object_mut() {
+                    if selected {
+                        object.insert("selected".into(), Value::Bool(true));
+                    }
+                }
+            }
+        }
         Ok(devices)
     }
 }

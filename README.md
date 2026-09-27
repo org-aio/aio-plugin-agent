@@ -90,6 +90,8 @@ Web conversations support requesting “打开 Postman” (Open Postman). First 
 
 Natural-language requests, including compound requests to open an app and enter text, pass intact to the Responses tool loop. The backend does not treat everything after “打开” as an application name. Opening, observing, typing and verification use authorized tools; a single online authorized device can be selected automatically, while multiple devices require a choice.
 
+Conversations can bind an execution device and one local project registered on that device. “Add local project” asks the device owner to choose a folder in the native directory picker; only the logical project ID is returned to the Agent. Project files and commands remain under the device's local workspace authorization and every task is checked against both the selected device and project.
+
 ## 设备与 Skill / Devices & Skills
 
 工作空间菜单为「智能体 → 对话 / 记忆图谱 / Skill 管理」。记忆图谱由可选 Memory 子插件提供。

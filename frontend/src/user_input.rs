@@ -2,7 +2,7 @@ use crate::{
     state::{self, AgentState},
     transport,
 };
-use az_agent_model::{Conversation, Thread, UserInputRequest};
+use az_agent_model::{Conversation, Thread, UserInputRequest, Workspace};
 use az_ui_components::{
     button::{Button, ButtonSize, ButtonVariant},
     dialog::{Dialog, DialogTitle},
@@ -10,6 +10,7 @@ use az_ui_components::{
     select::{Select, SelectItem, SelectPlacement},
 };
 use dioxus::prelude::*;
+use dioxus_icons::lucide::{FolderPlus, RefreshCw};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use uuid::Uuid;
@@ -141,6 +142,78 @@ pub fn ConversationDevice() -> Element {
             }
             Button {r#type:"button",size:ButtonSize::Sm,variant:ButtonVariant::Ghost,aria_label:"刷新设备",onclick:move |_|devices.restart(),"↻"}
             if let Some(Err(error))=devices.read().as_ref() { small {role:"alert","{error}"} }
+        }
+    }
+}
+
+#[component]
+pub fn ConversationWorkspace() -> Element {
+    let mut state = use_context::<Signal<AgentState>>();
+    let thread = state.read().thread.clone();
+    let worker = thread
+        .as_ref()
+        .and_then(|t| t.conversation.worker_id)
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+    let worker_id = Uuid::parse_str(&worker).ok();
+    let mut workspaces = use_resource(use_reactive!(|worker| {
+        let worker = worker.clone();
+        async move {
+            if worker.is_empty() {
+                return Ok(Vec::<Workspace>::new());
+            }
+            transport::request("GET", &format!("/devices/{worker}/workspaces"), Value::Null).await
+        }
+    }));
+    let selected = thread
+        .as_ref()
+        .and_then(|t| t.conversation.workspace_id.clone())
+        .unwrap_or_default();
+    let mut options = vec![SelectItem::new("", "自动选择 · 仅一个项目时使用")];
+    if let Some(Ok(list)) = workspaces.read().as_ref() {
+        options.extend(list.iter().map(|workspace| {
+            SelectItem::new(&workspace.id, format!("{} · 本地项目", workspace.label))
+        }));
+    }
+    if !selected.is_empty() && !options.iter().any(|option| option.value == selected) {
+        options.push(SelectItem::new(&selected, "当前项目不可用"));
+    }
+    let disabled = state.read().busy
+        || state.read().processing()
+        || worker_id.is_none()
+        || thread.as_ref().is_some_and(|t| t.pending_input.is_some());
+    rsx! {
+        div { class:"dx-conversation__model-selector",
+            Select { aria_label:"本地项目", placement: SelectPlacement::Top,value:selected,options,disabled,
+                on_value_change:move |value:String| {
+                    let conversation_id = state.peek().thread.as_ref().map(|t| t.conversation.id);
+                    if let Some(conversation_id) = conversation_id {
+                        state::run(state,async move {
+                            let workspace_id = (!value.is_empty()).then_some(value);
+                            let conversation:Conversation=transport::request("PUT",&format!("/conversations/{conversation_id}/workspace"),json!({"workspaceId":workspace_id})).await?;
+                            if let Some(thread)=state.write().thread.as_mut() {thread.conversation=conversation;}
+                            Ok(())
+                        });
+                    }
+                },
+            }
+            Button { r#type:"button",size:ButtonSize::Sm,variant:ButtonVariant::Ghost,aria_label:"添加本地项目",title:"在设备上选择本地文件夹",disabled,
+                onclick:move |_| {
+                    let Some(worker_id) = worker_id else { return; };
+                    let conversation_id = state.peek().thread.as_ref().map(|t| t.conversation.id);
+                    let Some(conversation_id) = conversation_id else { return; };
+                    state::run(state,async move {
+                        let workspace:Workspace=transport::request("POST",&format!("/devices/{worker_id}/workspaces"),Value::Null).await?;
+                        let conversation:Conversation=transport::request("PUT",&format!("/conversations/{conversation_id}/workspace"),json!({"workspaceId":workspace.id})).await?;
+                        if let Some(thread)=state.write().thread.as_mut() {thread.conversation=conversation;}
+                        workspaces.restart();
+                        Ok(())
+                    });
+                }, FolderPlus { size: 16 }
+            }
+            Button { r#type:"button",size:ButtonSize::Sm,variant:ButtonVariant::Ghost,aria_label:"刷新本地项目",title:"刷新本地项目",
+                disabled:worker_id.is_none() || !workspaces.finished(),onclick:move |_|workspaces.restart(),RefreshCw { size: 15 }
+            }
         }
     }
 }

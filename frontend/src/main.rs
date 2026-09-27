@@ -69,7 +69,7 @@ fn AgentApp() -> Element {
                 continue;
             }
             if let Some(thread) = current {
-                if !state.peek().processing() {
+                if !state.peek().processing() && !state.peek().memory_processing() {
                     continue;
                 }
                 let version = state.peek().generation;

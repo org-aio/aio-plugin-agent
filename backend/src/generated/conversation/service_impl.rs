@@ -353,6 +353,12 @@ impl AgentService for AgentServiceImpl {
     async fn devices(&self, scope: &Scope) -> ServiceResult<serde_json::Value> {
         super::user_input::devices(&self.core, scope).await
     }
+    async fn workspaces(&self, scope: &Scope, worker_id: Uuid) -> ServiceResult<Vec<Workspace>> {
+        super::user_input::workspaces(&self.core, scope, worker_id).await
+    }
+    async fn add_workspace(&self, scope: &Scope, worker_id: Uuid) -> ServiceResult<Workspace> {
+        super::user_input::add_workspace(&self.core, scope, worker_id).await
+    }
     async fn select_device(
         &self,
         scope: &Scope,
@@ -360,6 +366,14 @@ impl AgentService for AgentServiceImpl {
         selection: DeviceSelection,
     ) -> ServiceResult<Conversation> {
         super::user_input::select_device(&self.core, scope, id, selection).await
+    }
+    async fn select_workspace(
+        &self,
+        scope: &Scope,
+        id: Uuid,
+        selection: WorkspaceSelection,
+    ) -> ServiceResult<Conversation> {
+        super::user_input::select_workspace(&self.core, scope, id, selection).await
     }
     async fn swarm_tasks(&self, scope: &Scope, id: Uuid) -> ServiceResult<Vec<SwarmTask>> {
         super::swarm_store::list(&self.core, scope, id).await

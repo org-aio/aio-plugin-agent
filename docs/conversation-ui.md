@@ -35,4 +35,4 @@ npm run preview:ui
 
 没有下载 Playwright Chromium 时，可设置 `AIO_UI_BROWSER_CHANNEL=chrome` 使用本机 Chrome。测试生成 2009×1184 参考视口、1440×900 桌面、390×844 与 390×568 手机的截图、浅深主题、菜单、弹窗与几何测量，写入 `test-results/conversation-ui`；同时检查会话操作的宿主桥请求、路由控件禁用、环境栏开关、分组折叠、手机菜单边界和控制台错误。参考截图仅用于本地对照，不提交用户的截图或私人会话内容。
 
-`preview:ui` 仅使用内存夹具与正式 SDK 桥，不读取账户配置、不调用真实模型、不持久化真实数据。它验证真实 Wasm 界面及业务接线，不能替代 PostgreSQL、设备 Worker、Memory 或真实模型的完整链路验证。真实服务预览继续使用 `npm run preview`。
+`preview:ui` 仅使用内存夹具与正式 SDK 桥，不读取账户配置、不调用真实模型、不持久化真实数据。它验证真实 Wasm 界面及业务接线，包含设备绑定的本地项目选择与“添加本地项目”请求；不能替代 PostgreSQL、设备 Worker、系统目录选择器、Memory 或真实模型的完整链路验证。真实服务预览继续使用 `npm run preview`。

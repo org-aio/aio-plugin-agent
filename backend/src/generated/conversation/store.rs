@@ -14,6 +14,7 @@ pub fn provider(row: PgRow) -> Provider {
 pub fn conversation(row: PgRow) -> Conversation {
     Conversation {
         worker_id: row.get("worker_id"),
+        workspace_id: row.get("workspace_id"),
         model: row.get("model"),
         id: row.get("id"),
         title: row.get("title"),
@@ -22,8 +23,7 @@ pub fn conversation(row: PgRow) -> Conversation {
         updated_at: row.get("updated_at"),
     }
 }
-pub const CONVERSATION_COLUMNS: &str =
-    "id, title, provider_id, model, space_id, worker_id, updated_at::text AS updated_at";
+pub const CONVERSATION_COLUMNS: &str = "id, title, provider_id, model, space_id, worker_id, workspace_id, updated_at::text AS updated_at";
 
 // 调用方持有任务锁且确认没有活跃任务，避免把正常生成误判为中断。
 pub async fn recover(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {

@@ -133,6 +133,20 @@ pub async fn devices(
 ) -> ServiceResult<Json<serde_json::Value>> {
     Ok(Json(service.devices(&scope).await?))
 }
+pub async fn workspaces(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path(worker): Path<Uuid>,
+) -> ServiceResult<Json<Vec<Workspace>>> {
+    Ok(Json(service.workspaces(&scope, worker).await?))
+}
+pub async fn add_workspace(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path(worker): Path<Uuid>,
+) -> ServiceResult<Json<Workspace>> {
+    Ok(Json(service.add_workspace(&scope, worker).await?))
+}
 pub async fn select_device(
     State(service): Service,
     Extension(scope): Identity,
@@ -140,6 +154,14 @@ pub async fn select_device(
     Json(selection): Json<DeviceSelection>,
 ) -> ServiceResult<Json<Conversation>> {
     Ok(Json(service.select_device(&scope, id, selection).await?))
+}
+pub async fn select_workspace(
+    State(service): Service,
+    Extension(scope): Identity,
+    Path(id): Path<Uuid>,
+    Json(selection): Json<WorkspaceSelection>,
+) -> ServiceResult<Json<Conversation>> {
+    Ok(Json(service.select_workspace(&scope, id, selection).await?))
 }
 
 pub async fn swarm_tasks(
