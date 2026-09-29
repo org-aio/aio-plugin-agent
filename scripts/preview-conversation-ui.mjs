@@ -45,11 +45,7 @@ function message(role, content, status = "complete") {
 }
 function fixtures(options) {
   const defaultThreads = [
-    {
-      conversation: conversation("新对话"),
-      messages: [],
-      pendingInput: null,
-    },
+    { conversation: conversation("新对话"), messages: [], pendingInput: null },
     {
       conversation: conversation("为项目梳理下一步计划"),
       messages: [
