@@ -9,3 +9,8 @@
 .kotlin/
 .kotlin-cli/
 /graph/src/
+.idea/.gitignore
+.idea/aio-plugin-agent.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
