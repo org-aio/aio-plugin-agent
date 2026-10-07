@@ -9,6 +9,8 @@ import { privateWrite } from './session/storage.mjs';
 import { id, scoped, exportSource } from './memory/wiki.mjs';
 import { configuration, readiness, scan, run } from './notes/pipeline.mjs';
 import { appleAccounts } from './notes/apple.mjs';
+import { watch, watchReadiness } from './notes/watch.mjs';
+import { installWatch, removeWatch } from './notes/launch.mjs';
 
 const HELP = `AIO 智能体 CLI
   aio-agent login --url https://aio.addzero.site --account 用户 --password-stdin
@@ -19,11 +21,14 @@ const HELP = `AIO 智能体 CLI
   aio-agent memory capture --file 笔记.md --space 空间ID [--request-id 稳定ID]
   aio-agent memory source 来源ID --space 空间ID
   aio-agent memory export 来源ID --space 空间ID --output 目录
-  aio-agent notes init --config 绝对路径 --root 笔记目录 --output wiki目录
+  aio-agent notes init --config 绝对路径 [--root 笔记目录] --output wiki目录
   aio-agent notes accounts
   aio-agent notes status --config 配置文件
   aio-agent notes scan --config 配置文件
   aio-agent notes run --config 配置文件
+  aio-agent notes watch --config 配置文件
+  aio-agent notes watch-install --config 配置文件
+  aio-agent notes watch-remove
 
 通用：--profile 会话文件，默认 ~/.config/aio-agent/session.json
 capture 不输出正文。检索、get、source 仅返回服务端净化内容。`;
@@ -53,19 +58,29 @@ async function main() {
     return console.log(JSON.stringify(await login(profile, args.url, args.account, (await stdin()).replace(/\r?\n$/, ''))));
   }
   if (command === 'notes' && action === 'accounts') return console.log(JSON.stringify(await appleAccounts(), null, 2));
+  if (command === 'notes' && action === 'watch-remove') return console.log(JSON.stringify(await removeWatch()));
   if (command === 'notes' && action === 'init') {
-    if (!args.config || !args.root?.length || !args.output) throw new Error('init 需要 --config、--root、--output');
+    if (!args.config || !args.output) throw new Error('init 需要 --config、--output；仅监听 Apple 备忘录时无需 --root');
     // 不覆盖已有任务配置，以免改变已授权清理范围或目标空间。
     try { await readFile(args.config); throw new Error('配置已存在，请直接编辑'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-    await privateWrite(resolve(args.config), JSON.stringify({ version: 1, profile, roots: args.root.map(value => resolve(value)),
+    await privateWrite(resolve(args.config), JSON.stringify({ version: 1, profile, roots: (args.root || []).map(value => resolve(value)),
       appleAccounts: [], output: resolve(args.output), spaceId: null, modelBinding: null, model: null, cleanup: 'none', batchSize: 20 }, null, 2) + '\n');
-    return console.log('已创建笔记配置；填入实际空间与模型绑定后启用整理。');
+    return console.log('已创建笔记配置；填入空间与 Apple 账号后可启用只读监听，模型绑定用于后续整理。');
   }
   if (command === 'notes') {
     if (!args.config) throw new Error('需要 --config');
     const config = await configuration(resolve(args.config));
-    if (action === 'status') return console.log(JSON.stringify(await readiness(config), null, 2));
+    if (action === 'status') return console.log(JSON.stringify({ ...await readiness(config), watch: await watchReadiness(config) }, null, 2));
     if (action === 'scan') return console.log(JSON.stringify(await scan(config), null, 2));
+    if (action === 'watch-install') return console.log(JSON.stringify(await installWatch(resolve(args.config), config)));
+    if (action === 'watch') {
+      const controller = new AbortController();
+      const stop = () => controller.abort();
+      process.once('SIGINT', stop); process.once('SIGTERM', stop);
+      try { await watch(config, () => HostClient.load(config.profile), { signal: controller.signal }); }
+      finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
+      return;
+    }
     if (action !== 'run') throw new Error('未知笔记命令');
     const client = await HostClient.load(config.profile);
     try { console.log(JSON.stringify(await run(config, client), null, 2)); } finally { await client.close(); }

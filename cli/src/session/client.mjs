@@ -1,6 +1,6 @@
 import { privateJson, privateWrite } from './storage.mjs';
 
-const AGENT = 'https://github.com/zjarlin/aio-plugin-agent.git';
+const AGENT_SOURCES = new Set(['https://github.com/org-aio/aio-plugin-agent.git', 'https://github.com/zjarlin/aio-plugin-agent.git']);
 
 export function origin(value) {
   const url = new URL(value);
@@ -52,7 +52,7 @@ export class HostClient {
     if (session?.user_id !== this.profile.userId || session?.tenant_id !== this.profile.tenantId)
       throw new Error('登录用户或工作区已改变，请为目标工作区重新登录');
     const catalog = (await this.request('/api/runtime/catalog')).data;
-    const plugin = catalog.plugins.find(value => value.git === AGENT && value.state === 'active');
+    const plugin = catalog.plugins.find(value => AGENT_SOURCES.has(value.git) && value.state === 'active');
     const page = plugin && catalog.pages.find(value => value.id === `component:${plugin.source_id}:chat`);
     if (!page) throw new Error('当前工作区尚未启用 AIO v2 智能体插件');
     const grant = (await this.request('/api/runtime/frontend/mount', 'POST', { page_id: page.id })).data;

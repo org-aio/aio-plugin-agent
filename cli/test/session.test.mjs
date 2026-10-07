@@ -9,6 +9,7 @@ import { HostClient, login, origin } from '../src/session/client.mjs';
 test('正式登录和 v2 桥只传会话，不接受客户端指定用户', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'aio-agent-session-'));
   let tenant = 'workspace', calls = 0;
+  let git = 'https://github.com/org-aio/aio-plugin-agent.git';
   const session = () => ({ user_id: 'user', tenant_id: tenant, tenant_label: '工作区' });
   const server = createServer(async (req, res) => {
     const send = value => res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: value }));
@@ -21,7 +22,7 @@ test('正式登录和 v2 桥只传会话，不接受客户端指定用户', asyn
     assert.equal(req.headers.cookie, 'aio_session=test-session');
     assert.equal(req.headers['x-aio-user-id'], undefined);
     if (req.url === '/api/auth/session') return send(session());
-    if (req.url === '/api/runtime/catalog') return send({ plugins: [{ git: 'https://github.com/zjarlin/aio-plugin-agent.git', source_id: 'source', state: 'active' }], pages: [{ id: 'component:source:chat' }] });
+    if (req.url === '/api/runtime/catalog') return send({ plugins: [{ git, source_id: 'source', state: 'active' }], pages: [{ id: 'component:source:chat' }] });
     if (req.url === '/api/runtime/frontend/mount') { assert.equal(body.page_id, 'component:source:chat'); return send({ abi: 2, token: 'grant' }); }
     if (req.url === '/api/runtime/components/grant/request') {
       calls++; assert.equal(body.path, '/memory'); assert.equal(body.method, 'POST');
@@ -40,9 +41,13 @@ test('正式登录和 v2 桥只传会话，不接受客户端指定用户', asyn
     assert.equal((await client.memory('GET', '/spaces'))[0].title, '个人空间');
     assert.equal(calls, 1);
     await client.close();
+    git = 'https://github.com/zjarlin/aio-plugin-agent.git';
+    assert.equal((await client.memory('GET', '/spaces'))[0].title, '个人空间');
+    assert.equal(calls, 2);
+    await client.close();
     tenant = 'other';
     await assert.rejects(client.connect(), /工作区已改变/);
-    assert.equal(calls, 1);
+    assert.equal(calls, 2);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true }); }
 });
 

@@ -82,6 +82,34 @@ aio-agent notes run --config "$HOME/.config/aio-agent/notes.json"
 
 定时器只需要周期性调用 `notes run`。用 Codex 定时任务时，让它执行命令并检查数量结果，不把私人笔记复制到 Codex 上下文，不让调度模型替代 q3-4b 进行整理。机器休眠、登录过期、模型配置缺失时保留原件，恢复后继续。
 
+## Apple 备忘录只读近实时收件
+
+新设备没有配置时可只初始化 Apple 收件配置，不必指定本机笔记目录；已有配置不要重复初始化：
+
+```sh
+aio-agent notes init --config "$HOME/.config/aio-agent/notes.json" --output "$HOME/.local/share/aio-agent/apple-notes"
+```
+
+MacBook 和 Mac mini 分别安装 CLI、登录同一 AIO 用户与工作区，将相同目标 `spaceId` 和各自 `notes accounts` 返回的账号 ID 写入现有配置的 `appleAccounts`。账号 ID 是设备本地值，不直接复制另一台 Mac 的 ID。先在前台运行并完成 macOS“自动化 → 备忘录”授权：
+
+```sh
+aio-agent notes status --config "$HOME/.config/aio-agent/notes.json"
+aio-agent notes watch --config "$HOME/.config/aio-agent/notes.json"
+```
+
+`watch` 只读取显式选择的 Apple 账号，不扫描 `roots`，也不执行 wiki 导出或清理。默认每 3 秒检查修改时间，仅读取变化的正文，内容稳定约 2 秒后经正式收件接口入库，通常在下一次检查完成，不等待 15 分钟或模型整理。可在 JSON 的 `watch` 中设置 `intervalMs` 与 `settleMs`，范围均为 1000–60000。未绑定模型也能保存加密原文与净化来源，模型整理随后由现有队列处理。
+
+本机使用 SHA-256 检测正文变化，`apple-watch.json` 只保存 hash、随机请求 ID、时间和来源 ID，权限为 0600，不保存正文、标题或凭据。请求 ID 在提交前持久保存，网络失败、响应丢失和重启后可重试。两台设备不同的本地备忘录 ID 不影响去重：`deduplicate=true` 在同一用户、同一空间内按实际原文归一化比较，复用已有来源而不重复创建整理任务；含秘密的原文 hash 不作为服务端索引。监听需要支持该字段的 Memory 版本，旧版会拒绝重复新增并进入保守重试，不绕过隔离或改用明文数据库。
+
+确认前台收件成功后可安装登录自启，停止时只卸载监听，不删除备忘录或已保存资料：
+
+```sh
+aio-agent notes watch-install --config "$HOME/.config/aio-agent/notes.json"
+aio-agent notes watch-remove
+```
+
+后台由用户 LaunchAgent 托管，退出或重启后自动恢复；`last-watch.json` 和 `apple-watch.log` 只记录数量与运行状态。Mac 休眠、无网络、会话过期或未授权时不能保证即时入库；重新登录后会话在下一轮读取并继续同步。首次启动也会收集账号内已有笔记，每轮最多 `batchSize` 条。修改后的正文作为新资料收件，不覆盖随心记人工修改，不传播删除；附件只保留文本投影，附件原件仍在 Apple 备忘录，超额原文、锁定、共享和最近删除的笔记不自动删除或拆分。
+
 ## 产物与清理
 
 输出目录包含：

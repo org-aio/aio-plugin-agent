@@ -50,8 +50,12 @@ export async function* fileNotes(roots, output, report) {
 // 原文必须整篇进入 Memory 隔离器，不能先切断密码标签、JSON 或多行密钥。
 // 超过统一收件上限时保留原件，等待支持大文件的服务端隔离入口。
 export function chunks(note) {
-  // JSON 原文不能加 Markdown 标题，否则服务端会失去结构化字段识别。
-  const text = /^\s*[\[{]/.test(note.text) ? note.text : `# ${note.title}\n\n${note.text}`;
+  const text = noteText(note);
   if (Buffer.byteLength(text) > 100_000) throw new Error('笔记超过统一收件配额，未拆分原文并保留原件');
   return [text];
+}
+
+export function noteText(note) {
+  // JSON 原文不能加 Markdown 标题，否则服务端会失去结构化字段识别。
+  return /^\s*[\[{]/.test(note.text) ? note.text : `# ${note.title}\n\n${note.text}`;
 }
