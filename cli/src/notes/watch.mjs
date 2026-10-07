@@ -53,6 +53,7 @@ export async function captureChanges(config, client, state, path, options = {}) 
   const collect = options.collect || appleNotes;
   // 先持久保存随机请求 ID；提交后丢失响应或进程崩溃仍可原样重试。
   for await (const note of collect(config.appleAccounts, report, { records: state.records, maxNotes: config.batchSize || 20, now })) {
+    if (options.signal?.aborted) break;
     const key = appleKey(note.account, note.key);
     if (!note.text.trim()) { report.skipped++; continue; }
     const text = noteText(note).replace(/\r\n/g, '\n').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
@@ -97,6 +98,8 @@ export async function captureChanges(config, client, state, path, options = {}) 
       report.failed++;
     }
     await privateWrite(path, JSON.stringify(state) + '\n');
+    // 网络中断时不连续等待整批请求，未收件笔记在下一轮继续。
+    if (report.failed) break;
   }
   return report;
 }

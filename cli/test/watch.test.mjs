@@ -126,6 +126,23 @@ test('提交后响应丢失，断点重启复用随机请求 ID 且退避重试'
   await assert.rejects(watchState(config, { profile: { ...profile, userId: 'different' } }), /其他用户或空间/);
 }));
 
+test('断网一次失败即退出本轮，其他笔记和退出信号不会连续等待整批请求', () => fixture(async (root, config) => {
+  const client = server(), item = await watchState(config, client);
+  const first = note('第一条'), second = note('第二条', { key: 'second' });
+  const values = collect(first, second);
+  await captureChanges(config, client, item.state, item.path, { collect: values, now: 5000 });
+  const request = client.memory.bind(client); let attempts = 0;
+  client.memory = async () => { attempts++; throw new Error('离线'); };
+  const failed = await captureChanges(config, client, item.state, item.path, { collect: values, now: 6000 });
+  assert.equal(failed.failed, 1); assert.equal(attempts, 1);
+  client.memory = request;
+  const resumed = await captureChanges(config, client, item.state, item.path, { collect: collect(second, first), now: 7000 });
+  assert.equal(resumed.captured, 1); assert.equal(client.sources.size, 1);
+  const controller = new AbortController(); controller.abort();
+  await captureChanges(config, client, item.state, item.path, { collect: values, now: 10_000, signal: controller.signal });
+  assert.equal(client.sources.size, 1);
+}));
+
 test('超额、空白、附件笔记保留原件且不会阻塞其他笔记', () => fixture(async (root, config) => {
   const client = server(), item = await watchState(config, client);
   const values = collect(note('x'.repeat(100_000), { key: 'large' }), note('', { key: 'empty' }), note('有附件的正文', { key: 'attachment', attachments: true }));
