@@ -101,14 +101,14 @@ Conversations can bind an execution device and one local project registered on t
 
 The workspace menu is 「智能体 → 对话 / 记忆图谱 / Skill 管理」 (Agent → Conversations / Memory Graph / Skill Management). The memory graph is provided by the optional Memory sub-plugin. Pairing uses the AIO host's user/tenant system and device credentials are revocable; the Agent calls workers through the capability protocol and never directly accesses client disks or other plugins' databases. Skill Management is currently a standalone feature/service inside the Agent, not a plugin that needs separate installation and login. The host does not revoke devices used by other plugins just because the Agent is uninstalled.
 
-在已配对电脑运行 `aio-space skills-enable --path ~/.agents/skills`，即可每 30 秒双向同步；
-`aio-space skills-sync` 立即运行，`aio-space skills-disable` 暂停并撤回同步能力。
+在已配对电脑运行 `aio device skills-enable --path ~/.agents/skills`，即可每 30 秒双向同步；
+`aio device skills-sync` 立即运行，`aio device skills-disable` 暂停并撤回同步能力。
 正文和脚本、图片等资源一同同步；隐藏目录、Git、缓存和凭据文件不进入云端。
 网页支持新建、编辑、删除文件和处理双端冲突。单边变化自动传播，双边变化需要选择版本；
 本机覆盖/删除前留备份，云端保留加密历史。设备离线后恢复会重新比较，不按时间戳覆盖。
 对话提供 `skill_list` / `skill_read` 按需读取当前用户技能，同步和读取本身都不会运行技能脚本。
 
-Run `aio-space skills-enable --path ~/.agents/skills` on a paired computer to sync both ways every 30 seconds; `aio-space skills-sync` runs immediately, and `aio-space skills-disable` pauses and withdraws the sync capability. Bodies, scripts and assets such as images sync together; hidden directories, Git, caches and credential files never go to the cloud. The web UI supports creating, editing and deleting files and resolving two-sided conflicts. One-sided changes propagate automatically; two-sided changes require picking a version; local overwrites/deletes keep a backup first, and the cloud keeps encrypted history. When a device comes back online it re-compares instead of overwriting by timestamp. Conversations expose `skill_list` / `skill_read` to read the current user's skills on demand; neither syncing nor reading ever executes skill scripts.
+Run `aio device skills-enable --path ~/.agents/skills` on a paired computer to sync both ways every 30 seconds; `aio device skills-sync` runs immediately, and `aio device skills-disable` pauses and withdraws the sync capability. Bodies, scripts and assets such as images sync together; hidden directories, Git, caches and credential files never go to the cloud. The web UI supports creating, editing and deleting files and resolving two-sided conflicts. One-sided changes propagate automatically; two-sided changes require picking a version; local overwrites/deletes keep a backup first, and the cloud keeps encrypted history. When a device comes back online it re-compares instead of overwriting by timestamp. Conversations expose `skill_list` / `skill_read` to read the current user's skills on demand; neither syncing nor reading ever executes skill scripts.
 
 参考设计：[DeepSeek Harness](https://www.deepseek.com/harness/) 将工具、技能、执行环境和 UI 作为可组合能力；
 [字节 UI-TARS](https://github.com/bytedance/UI-TARS-desktop) 分开本地/远程电脑与浏览器操作器。

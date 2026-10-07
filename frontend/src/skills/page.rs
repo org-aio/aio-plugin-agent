@@ -78,7 +78,7 @@ pub fn SkillPage() -> Element {
             }
             if loaded() && library.read().devices.is_empty() {
                 EmptyState {title:"连接设备以同步 Skill",detail:"在已配对的电脑上运行一次，随后可在这里编辑并自动同步。",
-                    code {"aio-space skills-enable --path ~/.agents/skills"}
+                    code {"aio device skills-enable --path ~/.agents/skills"}
                 }
             }
             Input {aria_label:"搜索 Skill",placeholder:"搜索 Skill…",value:filter,oninput:move |e:FormEvent|filter.set(e.value())}

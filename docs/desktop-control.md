@@ -1,15 +1,15 @@
 # 通用桌面操作
 
-Agent → AIO 宿主授权桥 → 已配对 aio-space worker → Open Computer Use MCP → 本机桌面。结果沿原任务通道返回；界面和模型都能收到截图。模型仍在 Agent 中运行，worker 负责操作系统输入与观察，不在每台设备另起模型。
+Agent → AIO 宿主授权桥 → 已配对 aio device worker → Open Computer Use MCP → 本机桌面。结果沿原任务通道返回；界面和模型都能收到截图。模型仍在 Agent 中运行，worker 负责操作系统输入与观察，不在每台设备另起模型。
 
 ## 开启与升级
 
 1. 宿主先升级到支持 `desktop.control` 的版本；Agent 清单声明该能力并通过插件授权流程取得权限。
-2. 本机安装包含桌面适配器的 aio-space，沿用现有配对。运行 `aio-space desktop-enable` 后再以 `aio-space worker --background` 更新后台入口。
+2. 本机安装新版 `@zjarlin/aio`，沿用现有配对。运行 `aio device desktop-enable` 后再以 `aio device worker --background` 更新后台入口。
 3. 在 macOS 系统设置中授予实际 worker / OCU 运行程序辅助功能与屏幕录制权限。保持图形用户会话已登录、桌面可操作。OCU 自带 `ocu doctor` 可检查原生权限。
 4. 选择支持工具调用的模型及会话执行设备。依赖截图判断的操作还需要模型支持图像；纯文本模型可通过辅助功能文字和文件校验完成建表。已有“打开应用”或工作区权限不会自动扩大为桌面控制权限。
 
-`aio-space desktop-status` 查询本机开关；`aio-space desktop-disable` 先关闭本机接收，再撤销服务端能力并取消未完成桌面任务。网络失败应重试服务端撤销。该授权覆盖本机账号可以通过桌面完成的操作，包括前台鼠标和键盘输入；它不是应用沙箱，也不受工作区目录边界限制。
+`aio device desktop-status` 查询本机开关；`aio device desktop-disable` 先关闭本机接收，再撤销服务端能力并取消未完成桌面任务。网络失败应重试服务端撤销。该授权覆盖本机账号可以通过桌面完成的操作，包括前台鼠标和键盘输入；它不是应用沙箱，也不受工作区目录边界限制。
 
 ## 执行契约
 

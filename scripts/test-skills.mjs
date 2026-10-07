@@ -37,8 +37,8 @@ try {
  assert.equal((await request({operation:'resolve',device,path:payload.path,side:'local',local:'old',remote:'remote'})).status,409);
  assert.equal((await request({operation:'resolve',device,path:payload.path,side:'local',local:'local',remote:'remote'})).status,200);
  // 真实数据库、HTTP 服务和客户端文件同步器连起来，覆盖两个方向及基线重试。
- const {build}=await import('../../aio-plugin-space/node_modules/esbuild/lib/main.js');
- const output=join(directory,'sync.mjs');await build({entryPoints:['../aio-plugin-space/src/skills/sync.ts'],bundle:true,platform:'node',format:'esm',outfile:output});
+ const {build}=await import('../../aio-plugin-device/node_modules/esbuild/lib/main.js');
+ const output=join(directory,'sync.mjs');await build({entryPoints:['../aio-plugin-device/src/skills/sync.ts'],bundle:true,platform:'node',format:'esm',outfile:output});
  const {synchronize}=await import(output);
  const root=await realpath(directory);await mkdir(join(root,'local-skill'));await writeFile(join(root,'local-skill/SKILL.md'),'from device');
  const base={};const remote=async body=>{const r=await request(body,'sync-user','test',true,context);assert.equal(r.status,200);return r.body;};
