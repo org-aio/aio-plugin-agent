@@ -39,7 +39,7 @@ pub(crate) async fn history(data: &Value) -> Result {
                 for item in items {
                     <div class="dx-conversation__history-row" data-selected=(text(item,"id")==text(data,"selected"))>
                         button(action:"select",label:text(item,"title"),value:text(item,"id"))
-                        button(action:"delete-thread",label:format!("删除会话 {}",text(item,"title")),value:text(item,"id"),icon_only:true)
+                        button(action:"delete-thread",label:format!("{}会话 {}",if data["native"]==true {"归档"}else{"删除"},text(item,"title")),value:text(item,"id"),icon_only:true)
                     </div>
                 }
             </details>
@@ -178,6 +178,10 @@ pub(crate) async fn message(data: &Value) -> Result {
                 if let Some(details)=item.get("details") { <details><summary>"执行详情"</summary><pre>(serde_json::to_string_pretty(details).unwrap_or_default())</pre></details> }
                 <footer class="dx-conversation__message-actions">
                     button(action:"copy-message",label:if text(item,"role")=="user" {"复制消息"}else{"复制回复"},value:text(item,"id"),icon_only:true)
+                    if item["historyActions"]==true {
+                        button(action:"native-fork",label:"从此处分支",value:text(item,"turnId"))
+                        button(action:"native-revert",label:"回退到此处",value:text(item,"turnId"))
+                    }
                     if !text(item,"sourceId").is_empty() { button(action:"source",label:"来源资料",value:text(item,"sourceId")) }
                     for source in list(item,"citations") { button(action:"entry",label:text(source,"title"),value:text(source,"id")) }
                     if !list(item,"activatedNodeIds").is_empty() {button(action:"graph",label:"查看关联",value:text(item,"id"))}

@@ -314,8 +314,14 @@ async function verifyScenario(viewport, scenario) {
       sent: messageCalls().length,
     });
   } catch (error) {
-    await page.screenshot({ path: `${directory}/${label}-failure.png` });
-    errors.push({ label, error: error.message, browserErrors: caseErrors });
+    const failure = { label, error: error.message, browserErrors: caseErrors };
+    errors.push(failure);
+    // 浏览器意外退出时保留原始失败，不让取证截图覆盖实际原因。
+    try {
+      await page.screenshot({ path: `${directory}/${label}-failure.png` });
+    } catch (screenshotError) {
+      failure.screenshotError = screenshotError.message;
+    }
     throw error;
   } finally {
     await context.close();

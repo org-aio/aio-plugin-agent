@@ -3,6 +3,7 @@ import { request, render, report, cancelRender } from "./transport.js";
 import { CloudCodex, nativeMessages, applyEvent, mergeTurns } from "./cloud.js";
 import { Dialogs } from "./dialogs.js";
 import { discoverModels, modelSelection, selectedModel } from "./models.js";
+import { NativeWorkspace } from "./native-workspace.js";
 
 const $ = (selector) => document.querySelector(selector);
 const page = $("meta[name=aio-page]").content;
@@ -34,6 +35,14 @@ const dialogs = new Dialogs(state, {
   report,
   navigate,
   invalidate,
+});
+const nativeWorkspace = new NativeWorkspace(state, dialogs, {
+  navigate,
+  route,
+  loadConversations,
+  select,
+  redraw,
+  updateStatus,
 });
 let renderTimer;
 let messageDrawing = false;
@@ -188,6 +197,16 @@ async function loadConversations(more = false) {
         ]
       : items;
     state.cursor = result.nextCursor;
+    // 原生未提交新轮次的分支可能尚未进入索引，保留当前真实打开的会话入口。
+    if (
+      state.native &&
+      !state.conversations.some((item) => item.id === state.native.id)
+    ) {
+      state.conversations.unshift({
+        id: state.native.id,
+        title: state.native.name || state.native.preview || "新对话",
+      });
+    }
   } else {
     const result = await request("GET", "/conversations");
     if (epoch === state.epoch) {
@@ -240,6 +259,12 @@ async function select(id, { save = true } = {}) {
     };
     state.workspace = resumed.thread.cwd;
     state.model = resumed.model || state.model;
+    if (!state.conversations.some((item) => item.id === id)) {
+      state.conversations.unshift({
+        id,
+        title: state.native.name || state.native.preview || "新对话",
+      });
+    }
     await workspaces();
   } else {
     const thread = await request("GET", `/conversations/${id}`);
@@ -521,6 +546,7 @@ function scheduleDraw() {
 async function drawHistory() {
   const query = state.query.toLocaleLowerCase();
   await render($("#history"), "history", {
+    native: native(),
     conversations: state.conversations.filter((item) =>
       item.title.toLocaleLowerCase().includes(query),
     ),
@@ -553,6 +579,12 @@ function updateStatus() {
     return;
   }
   const active = running();
+  for (const item of document.querySelectorAll("[data-native]")) {
+    item.hidden = !native();
+  }
+  for (const item of document.querySelectorAll("[data-native=thread] button")) {
+    item.disabled = !threadId() || state.busy || active;
+  }
   const queued =
     !native() &&
     state.thread?.messages.some((message) => message.status === "queued");
@@ -657,6 +689,7 @@ async function restoreRoute() {
       state.thread = null;
       await redraw();
     }
+    await nativeWorkspace.restore();
   } finally {
     followRoute = false;
     if (state.fragment !== restoring && !navigating) {
@@ -667,6 +700,7 @@ async function restoreRoute() {
 bindInteractions({
   state,
   dialogs,
+  nativeWorkspace,
   native,
   threadId,
   run,

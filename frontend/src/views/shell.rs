@@ -24,6 +24,7 @@ pub(crate) async fn document(page: &str) -> Result {
                         <div class="dx-conversation__navigation">
                             button(action:"new",label:"新对话") button(action:"search",label:"搜索对话")
                             button(action:"spaces",label:"记忆空间") button(action:"skills",label:"Skill 管理")
+                            <div data-native="workspace" hidden=(true)>button(action:"native-archives",label:"已归档会话")</div>
                         </div>
                         <input id="history-search" class="dx-input" aria-label="搜索会话" placeholder="搜索会话" hidden=(true)>
                         <p class="dx-conversation__section-label">"空间与对话"</p>
@@ -34,7 +35,7 @@ pub(crate) async fn document(page: &str) -> Result {
                     <section class="dx-conversation__main" aria-label="对话" data-empty="true">
                         <header class="dx-conversation__header">
                             button(action:"sidebar",label:"切换会话列表",icon_only:true)<span id="title" class="dx-conversation__title">"新对话"</span>
-                            <div class="dx-conversation__toolbar">button(action:"environment",label:"环境信息",icon_only:true) button(action:"graph",label:"知识图谱",icon_only:true) button(action:"new",label:"新对话",icon_only:true)</div>
+                            <div class="dx-conversation__toolbar"><span data-native="workspace" hidden=(true)>button(action:"native-files",label:"项目文件",icon_only:true)</span>button(action:"environment",label:"环境信息",icon_only:true) button(action:"graph",label:"知识图谱",icon_only:true) button(action:"new",label:"新对话",icon_only:true)</div>
                         </header>
                         <button id="reconnect" type="button" class="dx-button" data-action="reconnect" hidden=(true)>"重新连接云电脑"</button>
                         <p id="error" class="dx-conversation__error" role="alert" hidden=(true)></p>
@@ -44,7 +45,7 @@ pub(crate) async fn document(page: &str) -> Result {
                             <form id="composer" class="dx-conversation__composer">
                                 <textarea id="draft" class="dx-textarea" name="content" rows="2" aria-label="发送消息" placeholder="随心输入" title="Enter 发送，Shift + Enter 换行"></textarea>
                                 <div class="dx-conversation__composer-actions">
-                                    <div class="dx-conversation__more"><button type="button" data-action="more" aria-label="更多选项" aria-expanded="false">"＋"</button><div id="conversation-actions" class="dx-conversation__action-menu" hidden=(true)>button(action:"tasks",label:"蜂群任务") button(action:"spaces",label:"记忆空间") button(action:"settings",label:"模型与工具设置")</div></div>
+                                    <div class="dx-conversation__more"><button type="button" data-action="more" aria-label="更多选项" aria-expanded="false">"＋"</button><div id="conversation-actions" class="dx-conversation__action-menu" hidden=(true)><div data-native="thread" hidden=(true)>button(action:"native-rename",label:"重命名会话") button(action:"native-fork",label:"新建分支会话") button(action:"native-compact",label:"压缩上下文")</div>button(action:"tasks",label:"蜂群任务") button(action:"spaces",label:"记忆空间") button(action:"settings",label:"模型与工具设置")</div></div>
                                     <div id="controls" class="dx-conversation__device-control"></div><div id="model-control" class="dx-conversation__model-control"></div>
                                     <button id="send" type="submit" class="dx-button dx-conversation__send" aria-label="发送">"↑"</button>
                                 </div>

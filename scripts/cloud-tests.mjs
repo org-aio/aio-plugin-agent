@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  fileLocation,
+  fileText,
+  NativeWorkspace,
+} from "../frontend/web/native-workspace.js";
+import {
   CloudCodex,
   applyEvent,
   mergeTurns,
@@ -11,6 +16,112 @@ import {
   modelSelection,
   selectedModel,
 } from "../frontend/web/models.js";
+
+test("原生文件浏览保留路径与 UTF-8 内容，不把二进制当文本", () => {
+  assert.equal(fileLocation("/project", "/project").parent, null);
+  assert.equal(
+    fileLocation("/project/目录", "/project").child("a b.txt"),
+    "/project/目录/a b.txt",
+  );
+  assert.equal(fileLocation("/project/目录", "/project").parent, "/project");
+  assert.equal(
+    fileLocation("C:\\project\\src", "C:\\project").child("readme.md"),
+    "C:\\project\\src\\readme.md",
+  );
+  assert.equal(
+    fileText(Buffer.from("中文\n<script>保持原文</script>").toString("base64")),
+    "中文\n<script>保持原文</script>",
+  );
+  assert.throws(() => fileText("AA=="), /二进制/);
+  assert.throws(() => fileText("\/w=="), /UTF-8/);
+});
+
+test("关闭文件对话框或切换设备后，旧文件响应不能重新打开页面", async () => {
+  for (const leave of ["close", "device"]) {
+    let finish;
+    const state = {
+      epoch: 0,
+      workspace: "/project",
+      cloud: {
+        connected: true,
+        workspace: { path: "/project" },
+        request: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      },
+    };
+    const renders = [];
+    const dialogs = {
+      epoch: 0,
+      async open(data) {
+        this.epoch++;
+        this.current = data;
+        renders.push(data);
+      },
+      close() {
+        this.epoch++;
+        this.current = null;
+      },
+    };
+    const workspace = new NativeWorkspace(state, dialogs, {
+      route: () =>
+        new URLSearchParams(
+          "panel=files&path=%2Fproject%2Freadme.md&entry=file",
+        ),
+    });
+    const reading = workspace.restore();
+    await new Promise(setImmediate);
+    if (leave === "close") {
+      dialogs.close();
+    } else {
+      state.epoch++;
+    }
+    finish({ dataBase64: "aGVsbG8=" });
+    await reading;
+    assert.equal(renders.length, 1);
+    assert.equal(renders[0].loading, true);
+  }
+});
+
+test("工作区操作不拦截原生审批按钮，执行中重复点击不重复分支", async () => {
+  const workspace = new NativeWorkspace({}, {}, {});
+  assert.equal(await workspace.action("native-approve", "accept", {}), false);
+  const prior = globalThis.document;
+  globalThis.document = { querySelector: () => null };
+  try {
+    let finish;
+    let count = 0;
+    const state = {
+      epoch: 0,
+      native: { id: "source" },
+      cloud: {
+        connected: true,
+        request: () => {
+          count++;
+          return new Promise((resolve) => {
+            finish = resolve;
+          });
+        },
+      },
+    };
+    const actions = {
+      updateStatus() {},
+      async loadConversations() {},
+      async select() {},
+    };
+    const control = new NativeWorkspace(state, {}, actions);
+    const first = control.action("native-fork", "", {});
+    await control.action("native-fork", "", {});
+    assert.equal(count, 1);
+    assert.equal(state.busy, true);
+    finish({ thread: { id: "fork" } });
+    await first;
+    assert.equal(state.busy, false);
+  } finally {
+    globalThis.document = prior;
+  }
+});
 
 test("大量供应商不会耗尽宿主桥，慢响应不阻塞其他发现，失败保留原默认模型", async () => {
   const providers = Array.from({ length: 24 }, (_, index) => ({

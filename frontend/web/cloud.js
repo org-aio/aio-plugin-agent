@@ -248,6 +248,15 @@ export function nativeMessages(thread) {
           .map((part) => (typeof part === "string" ? part : (part.text ?? "")))
           .join("\n");
       }
+      if (item.type === "contextCompaction") {
+        const labels = {
+          inProgress: "正在压缩上下文…",
+          completed: "上下文已压缩",
+          failed: "上下文压缩失败",
+          interrupted: "上下文压缩已停止",
+        };
+        content = labels[turn.status] ?? "上下文压缩";
+      }
       const images =
         (item.content ?? [])
           .filter?.(
@@ -262,6 +271,12 @@ export function nativeMessages(thread) {
         error: turn.error?.message,
         images,
         details: role === "tool" ? item : undefined,
+        turnId: turn.id,
+        historyActions:
+          role === "user" &&
+          turn.status !== "inProgress" &&
+          thread.status?.type !== "active" &&
+          !thread.turns.some((item) => item.status === "inProgress"),
       };
     }),
   );

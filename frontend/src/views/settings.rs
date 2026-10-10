@@ -112,6 +112,7 @@ pub(crate) async fn dialog(data: &Value) -> Result {
                 "workspace" => {
                     <form data-form="workspace">field(name:"path",label:"项目路径",value:text(item,"path"),required:true)<p>"选择已授权根目录中的项目。"</p><button class="dx-button" type="submit">"选择项目"</button></form>
                 },
+                "native-files"|"native-archives"|"native-rename" => {super::native::dialog(data:data)},
                 "tasks" => {
                     super::tasks::tasks(data:data)
                 },

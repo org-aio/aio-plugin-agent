@@ -2,6 +2,17 @@ use az_agent_frontend::{RenderRequest, render};
 use serde_json::json;
 
 #[tokio::test]
+async fn native_file_contents_and_names_cannot_inject_markup() {
+    let html = render(RenderRequest {
+        section: "dialog".into(),
+        data: json!({"kind":"native-files","title":"项目文件","path":"/project/test.txt","file":true,"content":"<script>alert(1)</script><img src=x onerror=alert(2)>"}),
+    }).await.unwrap();
+    assert!(!html.contains("<script>"));
+    assert!(!html.contains("<img src=x"));
+    assert!(html.contains("&lt;script&gt;"));
+}
+
+#[tokio::test]
 async fn message_html_and_untrusted_references_stay_inert() {
     let html = render(RenderRequest {
         section: "messages".into(),

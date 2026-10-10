@@ -1,5 +1,6 @@
 pub(crate) mod conversation;
 pub(crate) mod memory;
+mod native;
 pub(crate) mod settings;
 pub(crate) mod shell;
 pub(crate) mod skills;

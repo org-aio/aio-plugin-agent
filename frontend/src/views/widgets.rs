@@ -22,7 +22,7 @@ pub(super) async fn icon(name: &str) -> Result {
         ],
         "settings" | "environment" => &["M3 5h18v14H3Z", "M15 5v14"],
         "add-workspace" => &["M12 5v14M5 12h14"],
-        "folder" => &["M3 7V4h6l2 3h10v13H3Z"],
+        "folder" | "native-files" => &["M3 7V4h6l2 3h10v13H3Z"],
         "spaces" | "graph" | "skills" => &["M12 4v16M4 12h16", "M7 3h10v18H7Z"],
         "refresh-models" | "refresh-devices" | "refresh-panel" | "reconnect" => {
             &["M20 7a9 9 0 1 0 1 7", "M20 3v5h-5"]

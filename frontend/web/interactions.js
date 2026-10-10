@@ -7,6 +7,7 @@ const $ = (selector) => document.querySelector(selector);
 export function bindInteractions({
   state,
   dialogs,
+  nativeWorkspace,
   native,
   threadId,
   run,
@@ -48,6 +49,9 @@ export function bindInteractions({
     }
     void run(async () => {
       const { action: name, value } = action.dataset;
+      if (await nativeWorkspace.action(name, value, action)) {
+        return;
+      }
       if (
         state.busy &&
         [
@@ -225,6 +229,9 @@ export function bindInteractions({
         }
         return;
       }
+      if (await nativeWorkspace.submit(event.target)) {
+        return;
+      }
       if (event.target.dataset.form === "new") {
         if (state.busy) {
           return;
@@ -333,7 +340,11 @@ export function bindInteractions({
       document
         .querySelector(".dx-conversation__scrim")
         ?.setAttribute("hidden", "");
-      dialogs.close();
+      void run(async () => {
+        if (!(await nativeWorkspace.action("close-dialog"))) {
+          dialogs.close();
+        }
+      });
       $(".dx-conversation")?.setAttribute("data-history", "false");
     }
     const option = event.target.closest("[role=option]");
