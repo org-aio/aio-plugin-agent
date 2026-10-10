@@ -1,6 +1,21 @@
 {
   "git": "https://github.com/zjarlin/dioxus-admin-workbench.git",
-  "revision": "5889f4336ae98a77d25e439ad9d74ddcd5a7b8c4",
+  "revision": "7904f7c5b524d5155a9bc93e470dc712e7f6c5ff",
   "directory": "crates/ui/components/src",
-  "files": ["theme.css", "utilities.css", "admin/theme.css", "admin/style.css", "button/style.css", "input/style.css", "textarea/style.css", "select/style.css", "dialog/style.css", "markdown/style.css", "conversation/style.css", "conversation/codex.css", "conversation/codex-panels.css", "spatial/style.css"]
+  "files": [
+    "theme.css",
+    "utilities.css",
+    "admin/theme.css",
+    "admin/style.css",
+    "button/style.css",
+    "input/style.css",
+    "textarea/style.css",
+    "select/style.css",
+    "dialog/style.css",
+    "markdown/style.css",
+    "conversation/style.css",
+    "conversation/codex.css",
+    "conversation/codex-panels.css",
+    "spatial/style.css"
+  ]
 }

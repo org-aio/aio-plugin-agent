@@ -597,6 +597,9 @@ function updateStatus() {
     (!native() && !!state.thread?.pendingInput) ||
     (native() && !state.cloud.connected);
   $("#draft").disabled = state.busy;
+  for (const item of document.querySelectorAll("[data-action=add-workspace]")) {
+    item.disabled = !state.target || state.busy;
+  }
   const modelLocked =
     state.busy ||
     (!native() && (active || queued || !!state.thread?.pendingInput));

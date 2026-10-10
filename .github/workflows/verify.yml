@@ -72,6 +72,9 @@ jobs:
       - run: npm run test:ui
         env:
           AIO_UI_BROWSER_CHANNEL: chrome
+      - run: npm run test:mobile
+        env:
+          AIO_UI_BROWSER_CHANNEL: chrome
       - run: npm run test:processing
         env:
           AIO_UI_BROWSER_CHANNEL: chrome

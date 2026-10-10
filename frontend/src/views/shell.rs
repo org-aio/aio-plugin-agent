@@ -6,7 +6,7 @@ pub(crate) async fn document(page: &str) -> Result {
     view! { cx =>
         <!DOCTYPE html>
         <html lang="zh-CN"><head>
-            <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+            <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
             <meta name="aio-page" content=(page)><title>"AIO 智能体"</title>
             <link rel="stylesheet" href="styles/theme.css"><link rel="stylesheet" href="styles/admin/theme.css">
             <link rel="stylesheet" href="styles/admin/style.css"><link rel="stylesheet" href="styles/utilities.css">
@@ -45,7 +45,7 @@ pub(crate) async fn document(page: &str) -> Result {
                             <form id="composer" class="dx-conversation__composer">
                                 <textarea id="draft" class="dx-textarea" name="content" rows="2" aria-label="发送消息" placeholder="随心输入" title="Enter 发送，Shift + Enter 换行"></textarea>
                                 <div class="dx-conversation__composer-actions">
-                                    <div class="dx-conversation__more"><button type="button" data-action="more" aria-label="更多选项" aria-expanded="false">"＋"</button><div id="conversation-actions" class="dx-conversation__action-menu" hidden=(true)><div data-native="thread" hidden=(true)>button(action:"native-rename",label:"重命名会话") button(action:"native-fork",label:"新建分支会话") button(action:"native-compact",label:"压缩上下文")</div>button(action:"tasks",label:"蜂群任务") button(action:"spaces",label:"记忆空间") button(action:"settings",label:"模型与工具设置")</div></div>
+                                    <div class="dx-conversation__more"><button type="button" data-action="more" aria-label="更多选项" aria-expanded="false">"＋"</button><div id="conversation-actions" class="dx-conversation__action-menu" hidden=(true)><div data-native="thread" hidden=(true)>button(action:"native-rename",label:"重命名会话") button(action:"native-fork",label:"新建分支会话") button(action:"native-compact",label:"压缩上下文")</div><div class="dx-conversation__mobile-actions">button(action:"refresh-devices",label:"刷新设备") button(action:"add-workspace",label:"添加本地项目") button(action:"refresh-models",label:"刷新模型列表")</div>button(action:"tasks",label:"蜂群任务") button(action:"spaces",label:"记忆空间") button(action:"settings",label:"模型与工具设置")</div></div>
                                     <div id="controls" class="dx-conversation__device-control"></div><div id="model-control" class="dx-conversation__model-control"></div>
                                     <button id="send" type="submit" class="dx-button dx-conversation__send" aria-label="发送">"↑"</button>
                                 </div>

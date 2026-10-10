@@ -95,7 +95,8 @@ try {
       `${label}: 工作区高度`,
     );
     assert(
-      measurements.device.right <= measurements.model.x + 1,
+      measurements.device.right <= measurements.model.x + 1 ||
+        measurements.device.bottom <= measurements.model.y + 1,
       `${label}: 模型与设备控件重叠`,
     );
     assert(

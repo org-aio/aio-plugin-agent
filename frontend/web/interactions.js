@@ -28,6 +28,10 @@ export function bindInteractions({
   updateStatus,
 }) {
   let composing = false;
+  const touchInput = matchMedia("(pointer: coarse)");
+  if (touchInput.matches && $("#draft")) {
+    $("#draft").title = "回车换行，点击箭头发送";
+  }
   window.addEventListener("pagehide", () => {
     void state.cloud?.close();
   });
@@ -49,6 +53,13 @@ export function bindInteractions({
     }
     void run(async () => {
       const { action: name, value } = action.dataset;
+      if (name !== "more") {
+        const menu = $("#conversation-actions");
+        if (menu) {
+          menu.hidden = true;
+          $("[data-action=more]")?.setAttribute("aria-expanded", "false");
+        }
+      }
       if (await nativeWorkspace.action(name, value, action)) {
         return;
       }
@@ -133,6 +144,8 @@ export function bindInteractions({
       }
       if (name === "select") {
         await select(value);
+        $(".dx-conversation").dataset.history = "false";
+        $(".dx-conversation__scrim").hidden = true;
         return;
       }
       if (name === "new") {
@@ -375,7 +388,8 @@ export function bindInteractions({
       event.key === "Enter" &&
       !event.shiftKey &&
       !event.isComposing &&
-      !composing
+      !composing &&
+      (!touchInput.matches || event.ctrlKey || event.metaKey)
     ) {
       event.preventDefault();
       void run(send);
