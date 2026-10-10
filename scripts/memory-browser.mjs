@@ -4,6 +4,21 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function requestOperation(request) {
+  const method = request.method();
+  const path = new URL(request.url()).pathname;
+  if (method === "POST" && path === "/invoke") {
+    try {
+      const operation = request.postDataJSON();
+      return { method: operation.method, path: operation.path };
+    } catch {
+      return { method, path };
+    }
+  }
+  return { method, path };
+}
+
 async function eventually(read, predicate) {
   for (let i = 0; i < 150; i++) {
     const value = await read();
@@ -116,13 +131,47 @@ export async function verifyBrowser({
       const page = await context.newPage();
       const frame = page.frameLocator("iframe");
       const errors = [];
+      const pendingReads = new Set();
+      const leavingReads = new Set();
+      const navigationCancellations = [];
+      let leaving = false;
       page.on("pageerror", (error) => errors.push(error.message));
       page.on("console", (m) => {
         if (m.type() === "error") errors.push(m.text());
       });
-      page.on("requestfailed", (r) =>
-        errors.push(r.url() + ": " + r.failure()?.errorText),
-      );
+      page.on("request", (request) => {
+        const operation = requestOperation(request);
+        if (
+          operation.method === "GET" ||
+          (operation.method === "POST" && operation.path === "/ui/render")
+        ) {
+          pendingReads.add(request);
+          if (leaving) {
+            leavingReads.add(request);
+          }
+        }
+      });
+      page.on("requestfinished", (request) => {
+        pendingReads.delete(request);
+        leavingReads.delete(request);
+      });
+      page.on("requestfailed", (request) => {
+        const failure = request.failure()?.errorText;
+        const operation = requestOperation(request);
+        // 跨文档导航取消的只读请求单独留证，写入和其他网络失败仍使验收失败。
+        if (failure === "net::ERR_ABORTED" && leavingReads.has(request)) {
+          navigationCancellations.push(operation);
+        } else {
+          errors.push(`${operation.method} ${operation.path}: ${failure}`);
+        }
+        pendingReads.delete(request);
+        leavingReads.delete(request);
+      });
+      page.on("framenavigated", (frame) => {
+        if (frame === page.mainFrame()) {
+          leaving = false;
+        }
+      });
       const click = async (label) =>
         frame.getByRole("button", { name: label, exact: true }).click();
       const dialog = () => frame.getByRole("dialog").last();
@@ -320,7 +369,15 @@ export async function verifyBrowser({
           "Horizontal overflow",
         );
         // 独立设置页通过相同沙箱桥挂载，保存后不重复弹出设置容器。
-        await page.goto(`${origin}/?page=settings`);
+        leaving = true;
+        for (const request of pendingReads) {
+          leavingReads.add(request);
+        }
+        try {
+          await page.goto(`${origin}/?page=settings`);
+        } finally {
+          leaving = false;
+        }
         await frame
           .getByRole("heading", { name: "模型服务", exact: true })
           .waitFor({ timeout: 60000 });
@@ -373,6 +430,7 @@ export async function verifyBrowser({
           graph: true,
           settingsPage: true,
           searchSettings: true,
+          navigationCancellations,
           errors,
         });
       } catch (error) {
