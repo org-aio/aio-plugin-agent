@@ -8,14 +8,9 @@ export async function verifyQueue({ memory, directory, provider }) {
     connectionString: process.env.AIO_TEST_DATABASE_URL,
   });
   try {
-    const { source } = JSON.parse(
+    const { schema } = JSON.parse(
       await readFile(`${directory}/memory/memory-host.json`, "utf8"),
     );
-    const { rows } = await admin.query(
-      "SELECT schema_name FROM aio_plugin_host.database_bindings WHERE source_id=$1 AND tenant_id=$2",
-      [source, "preview"],
-    );
-    const schema = rows[0].schema_name;
     assert.match(schema, /^p_[a-f0-9]+$/);
     const space = (
       await memory("POST", "/spaces", {

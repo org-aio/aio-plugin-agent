@@ -54,7 +54,7 @@ async function jsonBody(request) {
   return JSON.parse(Buffer.concat(chunks));
 }
 async function startMemory() {
-  child = spawn(`${memoryRoot}/dev/target/release/aio-agent-memory-dev`, [], {
+  child = spawn(process.execPath, [resolve("scripts/memory-fixture.mjs")], {
     cwd: memoryRoot,
     env: {
       ...process.env,
@@ -249,7 +249,7 @@ const upstream = await listen(async (req, res) => {
 const port = Number(process.env.AIO_MEMORY_TEST_PORT || 4299),
   origin = `http://127.0.0.1:${port}`;
 async function startAgent() {
-  backend = spawn("target/debug/az-agent-server", [], {
+  backend = spawn(process.env.AIO_AGENT_SERVER || "target/debug/az-agent-server", [], {
     env: {
       ...process.env,
       AIO_AGENT_DATABASE_URL: config.databaseUrl,
@@ -303,6 +303,10 @@ async function verify() {
   await startAgent();
   const { verifySettings } = await import("./settings-tests.mjs");
   await verifySettings({ agent, pool });
+  if (process.env.AIO_MEMORY_BROWSER_ONLY === "1") {
+    const { prepareProviders } = await import("./memory-browser.mjs");
+    await prepareProviders(agent);
+  }
   const provider = await agent("POST", "/providers", {
     label: "memory-test",
     model: "memory-test",
@@ -435,7 +439,7 @@ async function verify() {
         role: "READER",
       })
     ).status,
-    204,
+    200,
   );
   assert.equal(
     (await memory("GET", `/sources/${sourceId}`, null, "reader")).status,

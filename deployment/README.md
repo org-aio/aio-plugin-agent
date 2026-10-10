@@ -1,6 +1,6 @@
 # 部署边界
 
-`aio-plugin.toml` 声明原生 v2 process、独立设置页和权限。宿主 >=2026.9.21，受控构建使用 `scripts/build.sh --process` 生成 Dioxus 前端、设置入口及 glibc 2.17 Linux ELF。运行时固定 `Containerfile` 的 runtime 镜像摘要；镜像只包含 Rust ELF 所需系统动态库和证书，不包含 Node、Pi、JVM、Shell 或构建工具。
+`aio-plugin.toml` 声明原生 v2 process、独立设置页和权限。宿主 >=2026.9.21，受控构建使用 `scripts/build.sh --process` 生成 Topcoat 前端、设置入口及 glibc 2.17 Linux ELF。运行时固定 `Containerfile` 的 runtime 镜像摘要；镜像只包含 Rust ELF 所需系统动态库和证书，不包含 Node、Pi、JVM、Shell 或构建工具。
 
 容器以 UID/GID 65532 运行、只读、禁网，通过 AIO_PLUGIN_CONFIG 读取宿主绑定并在 AIO_PLUGIN_SOCKET 提供服务。宿主独立数据库角色只有本插件 DML 权限，主密钥稳定派生，升级沿用原 schema；卸载不删除数据。激活先停止旧实例，不能宣称无缝并行滚动替换。
 

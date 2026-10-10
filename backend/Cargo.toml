@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 az-agent-engine = { path = "../engine" }
 az-agent-model = { path = "../shared/rust" }
+az-agent-frontend = { path = "../frontend" }
 az-plugin-contract = { git = "https://github.com/zjarlin/aio-platform.git", rev = "cc8ac37a112e3ed354550b1ec23deb9e0a905fc1" }
 anyhow.workspace = true
 serde.workspace = true

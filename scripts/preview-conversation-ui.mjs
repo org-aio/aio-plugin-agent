@@ -1,4 +1,6 @@
-// 仅供本地界面验收：真实 Wasm 与正式宿主桥，使用独立的内存数据，不连接账户或模型。
+// 仅供本地界面验收：真实 Topcoat 产物与正式宿主桥，使用独立的内存数据，不连接账户或模型。
+import { execFile } from "node:child_process";
+import { previewNavigation } from "./preview-navigation.mjs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname } from "node:path";
@@ -187,7 +189,23 @@ export async function startConversationPreview(port = 4196, options = {}) {
         const body = input.body.length
           ? JSON.parse(Buffer.from(input.body))
           : null;
-        const output = data.invoke(input.method, input.path, body);
+        let output;
+        if (input.path === "/ui/render") {
+          const binary =
+            process.env.AIO_UI_RENDERER || "target/debug/az-agent-frontend";
+          output = await new Promise((resolve, reject) => {
+            const child = execFile(
+              binary,
+              ["--render"],
+              { maxBuffer: 16 * 1024 * 1024 },
+              (error, stdout) =>
+                error ? reject(error) : resolve({ html: stdout }),
+            );
+            child.stdin.end(JSON.stringify(body));
+          });
+        } else {
+          output = data.invoke(input.method, input.path, body);
+        }
         res.writeHead(200, { "content-type": "application/json" }).end(
           JSON.stringify({
             status: 200,
@@ -205,7 +223,7 @@ export async function startConversationPreview(port = 4196, options = {}) {
         res
           .writeHead(200, { "content-type": "text/html" })
           .end(
-            `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AIO · 对话界面验收</title><body style="margin:0;overflow:hidden"><iframe title="智能体" src="/assets/${entry}" sandbox="allow-scripts allow-forms" style="display:block;width:100vw;height:100dvh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';mountBridge(document.querySelector('iframe'),async request=>{const r=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...request,body:Array.from(request.body)})});return r.json()},{clipboard:true});</script></body></html>`,
+            `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AIO · 对话界面验收</title><body style="margin:0;overflow:hidden"><iframe title="智能体" src="/assets/${entry}" sandbox="allow-scripts allow-forms" style="display:block;width:100vw;height:100dvh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';${previewNavigation()}mountBridge(document.querySelector('iframe'),async request=>{const r=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...request,body:Array.from(request.body)})});return r.json()},{clipboard:true});</script></body></html>`,
           );
         return;
       }
@@ -213,9 +231,11 @@ export async function startConversationPreview(port = 4196, options = {}) {
         res.writeHead(204).end();
         return;
       }
-      const bridge = ["/bridge/guest.js", "/bridge/host.mjs"].includes(
-        url.pathname,
-      );
+      const bridge = [
+        "/bridge/guest.js",
+        "/bridge/host.mjs",
+        "/bridge/navigation.js",
+      ].includes(url.pathname);
       const file = bridge
         ? resolve("sdk/web", url.pathname.split("/").at(-1))
         : resolve(assets, "." + url.pathname.slice(7));
@@ -233,7 +253,7 @@ export async function startConversationPreview(port = 4196, options = {}) {
             .toString()
             .replace(
               "<head>",
-              `<head><base href="${origin}/assets/"><script src="/bridge/guest.js"></script>`,
+              `<head><base href="${origin}/assets/"><script src="/bridge/navigation.js" data-token="preview"></script><script src="/bridge/guest.js"></script>`,
             ),
         );
       const types = {

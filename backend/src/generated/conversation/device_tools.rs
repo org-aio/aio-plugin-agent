@@ -143,10 +143,8 @@ impl Tool for List {
                     .0
                     .selected
                     .is_some_and(|id| device["id"] == id.to_string());
-                if let Some(object) = device.as_object_mut() {
-                    if selected {
-                        object.insert("selected".into(), Value::Bool(true));
-                    }
+                if selected && let Some(object) = device.as_object_mut() {
+                    object.insert("selected".into(), Value::Bool(true));
                 }
             }
         }

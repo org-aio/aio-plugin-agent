@@ -4,6 +4,21 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function requestOperation(request) {
+  const method = request.method();
+  const path = new URL(request.url()).pathname;
+  if (method === "POST" && path === "/invoke") {
+    try {
+      const operation = request.postDataJSON();
+      return { method: operation.method, path: operation.path };
+    } catch {
+      return { method, path };
+    }
+  }
+  return { method, path };
+}
+
 async function eventually(read, predicate) {
   for (let i = 0; i < 150; i++) {
     const value = await read();
@@ -11,6 +26,53 @@ async function eventually(read, predicate) {
     await pause(200);
   }
   throw new Error("Browser workflow timed out");
+}
+
+export async function prepareProviders(agent) {
+  // 保留 17 个旧服务和本轮主服务，仍覆盖宿主桥容量；只清理本地夹具。
+  const providers = (await agent("GET", "/settings")).providers;
+  const baseline = new Set(providers.map((provider) => provider.id));
+  for (const provider of providers) {
+    if (baseline.size <= 17) {
+      break;
+    }
+    if (
+      new URL(provider.endpoint).hostname === "127.0.0.1" &&
+      /^(memory-test|browser-model-(desktop|mobile))$/.test(provider.label)
+    ) {
+      if (await removeFixtureProvider(agent, provider.id)) {
+        baseline.delete(provider.id);
+      }
+    }
+  }
+  assert(baseline.size <= 19, "测试库没有足够的模型服务名额");
+}
+
+async function removeFixtureProvider(agent, providerId) {
+  const conversations = (await agent("GET", "/conversations")).filter(
+    (conversation) => conversation.providerId === providerId,
+  );
+  if (
+    conversations.some(
+      (conversation) => !/^Topcoat (desktop|mobile)$/.test(conversation.title),
+    )
+  ) {
+    return false;
+  }
+  for (const conversation of conversations) {
+    await agent("PUT", `/conversations/${conversation.id}/model`, {
+      providerId: null,
+      model: null,
+    });
+  }
+  await agent(
+    "DELETE",
+    `/providers/${providerId}`,
+    undefined,
+    "developer",
+    204,
+  );
+  return true;
 }
 
 export async function verifyBrowser({
@@ -21,6 +83,9 @@ export async function verifyBrowser({
   agent,
   canary,
 }) {
+  const baseline = new Set(
+    (await agent("GET", "/settings")).providers.map((provider) => provider.id),
+  );
   const port = Number(process.env.AIO_MEMORY_BROWSER_PORT || 4348);
   const origin = `http://127.0.0.1:${port}`;
   const preview = spawn(process.execPath, ["scripts/preview.mjs"], {
@@ -35,7 +100,11 @@ export async function verifyBrowser({
   });
   let previewLog = "";
   preview.stderr.on("data", (bytes) => (previewLog += bytes));
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch({
+    channel: process.env.AIO_UI_BROWSER_EXECUTABLE ? undefined : "chrome",
+    executablePath: process.env.AIO_UI_BROWSER_EXECUTABLE,
+    headless: true,
+  });
   await mkdir("test-results", { recursive: true });
   const reports = [];
   const memory = async (method, path, body = null) =>
@@ -62,23 +131,59 @@ export async function verifyBrowser({
       const page = await context.newPage();
       const frame = page.frameLocator("iframe");
       const errors = [];
+      const pendingReads = new Set();
+      const leavingReads = new Set();
+      const navigationCancellations = [];
+      let leaving = false;
       page.on("pageerror", (error) => errors.push(error.message));
       page.on("console", (m) => {
         if (m.type() === "error") errors.push(m.text());
       });
-      page.on("requestfailed", (r) =>
-        errors.push(r.url() + ": " + r.failure()?.errorText),
-      );
+      page.on("request", (request) => {
+        const operation = requestOperation(request);
+        if (
+          operation.method === "GET" ||
+          (operation.method === "POST" && operation.path === "/ui/render")
+        ) {
+          pendingReads.add(request);
+          if (leaving) {
+            leavingReads.add(request);
+          }
+        }
+      });
+      page.on("requestfinished", (request) => {
+        pendingReads.delete(request);
+        leavingReads.delete(request);
+      });
+      page.on("requestfailed", (request) => {
+        const failure = request.failure()?.errorText;
+        const operation = requestOperation(request);
+        // 跨文档导航取消的只读请求单独留证，写入和其他网络失败仍使验收失败。
+        if (failure === "net::ERR_ABORTED" && leavingReads.has(request)) {
+          navigationCancellations.push(operation);
+        } else {
+          errors.push(`${operation.method} ${operation.path}: ${failure}`);
+        }
+        pendingReads.delete(request);
+        leavingReads.delete(request);
+      });
+      page.on("framenavigated", (frame) => {
+        if (frame === page.mainFrame()) {
+          leaving = false;
+        }
+      });
       const click = async (label) =>
         frame.getByRole("button", { name: label, exact: true }).click();
       const dialog = () => frame.getByRole("dialog").last();
       try {
         const provider = await agent("POST", "/providers", {
-          label: `browser-model-${name}`, endpoint: templateProvider.endpoint,
-          model: "memory-test", secret: "provider-test-key",
+          label: `browser-model-${name}`,
+          endpoint: templateProvider.endpoint,
+          model: "memory-test",
+          secret: "provider-test-key",
         });
         const conversation = await agent("POST", "/conversations", {
-          title: `Dioxus ${name}`,
+          title: `Topcoat ${name}`,
           providerId: provider.id,
           spaceId: space.id,
         });
@@ -92,6 +197,9 @@ export async function verifyBrowser({
         await frame
           .getByRole("textbox", { name: "发送消息", exact: true })
           .waitFor({ timeout: 60000 });
+        if (name === "mobile") {
+          await click("切换会话列表");
+        }
         await click("设置");
         await click("添加服务");
         assert.equal(
@@ -105,10 +213,9 @@ export async function verifyBrowser({
           .getByLabel("API Key", { exact: true })
           .fill("provider-test-key");
         await click("读取模型");
-        await click("选择模型");
-        await frame
-          .getByRole("option", { name: "memory-test", exact: true })
-          .click();
+        await dialog()
+          .getByRole("combobox", { name: "模型", exact: true })
+          .selectOption("memory-test");
         await dialog()
           .getByRole("button", { name: "保存", exact: true })
           .click();
@@ -117,9 +224,12 @@ export async function verifyBrowser({
           .waitFor();
         await page.waitForTimeout(250);
         await page.screenshot({
-          path: `test-results/dioxus-${name}-models.png`,
+          path: `test-results/topcoat-${name}-models.png`,
         });
         await click("关闭");
+        if (name === "mobile") {
+          await click("收起会话列表");
+        }
         const settings = await agent("GET", "/settings");
         const configured = settings.providers.find(
           (p) =>
@@ -233,7 +343,7 @@ export async function verifyBrowser({
         await frame.getByText(canary, { exact: true }).waitFor();
         await click("隐藏秘密");
         await page.screenshot({
-          path: `test-results/dioxus-${name}-source.png`,
+          path: `test-results/topcoat-${name}-source.png`,
         });
         await click("关闭");
         await click("知识图谱");
@@ -241,12 +351,16 @@ export async function verifyBrowser({
           .getByRole("img", { name: "记忆关系图", exact: true })
           .waitFor();
         await page.screenshot({
-          path: `test-results/dioxus-${name}-graph.png`,
+          path: `test-results/topcoat-${name}-graph.png`,
         });
         await click("收起图谱");
-        await frame.getByRole("img", { name: "记忆关系图", exact: true }).waitFor({ state: "hidden" });
+        await frame
+          .getByRole("img", { name: "记忆关系图", exact: true })
+          .waitFor({ state: "hidden" });
         await page.waitForTimeout(250);
-        await page.screenshot({ path: `test-results/dioxus-${name}-chat.png` });
+        await page.screenshot({
+          path: `test-results/topcoat-${name}-chat.png`,
+        });
         assert.equal(
           await frame
             .locator("body")
@@ -255,7 +369,15 @@ export async function verifyBrowser({
           "Horizontal overflow",
         );
         // 独立设置页通过相同沙箱桥挂载，保存后不重复弹出设置容器。
-        await page.goto(`${origin}/?page=settings`);
+        leaving = true;
+        for (const request of pendingReads) {
+          leavingReads.add(request);
+        }
+        try {
+          await page.goto(`${origin}/?page=settings`);
+        } finally {
+          leaving = false;
+        }
         await frame
           .getByRole("heading", { name: "模型服务", exact: true })
           .waitFor({ timeout: 60000 });
@@ -283,7 +405,7 @@ export async function verifyBrowser({
           ),
         );
         await page.screenshot({
-          path: `test-results/dioxus-${name}-settings.png`,
+          path: `test-results/topcoat-${name}-settings.png`,
         });
         await click("配置网页搜索");
         await dialog().getByText("清除已保存的密钥", { exact: true }).click();
@@ -297,6 +419,7 @@ export async function verifyBrowser({
         assert.deepEqual(errors, []);
         reports.push({
           name,
+          baselineProviders: baseline.size,
           manualUrl: true,
           noName: true,
           discoveredModels: true,
@@ -307,16 +430,17 @@ export async function verifyBrowser({
           graph: true,
           settingsPage: true,
           searchSettings: true,
+          navigationCancellations,
           errors,
         });
       } catch (error) {
         console.error(JSON.stringify(errors));
         console.error(await frame.locator("head").innerHTML());
         await page.screenshot({
-          path: `test-results/dioxus-${name}-failure.png`,
+          path: `test-results/topcoat-${name}-failure.png`,
         });
         await writeFile(
-          `test-results/dioxus-${name}-failure.txt`,
+          `test-results/topcoat-${name}-failure.txt`,
           (await frame.locator("body").innerText()).replaceAll(
             canary,
             "[protected]",
@@ -328,10 +452,10 @@ export async function verifyBrowser({
       }
     }
     await writeFile(
-      "test-results/dioxus-browser-report.json",
+      "test-results/topcoat-browser-report.json",
       JSON.stringify(reports, null, 2),
     );
-    console.log("Dioxus desktop/mobile browser checks passed");
+    console.log("Topcoat desktop/mobile browser checks passed");
   } finally {
     await browser.close();
     if (preview.exitCode === null) {
@@ -339,6 +463,12 @@ export async function verifyBrowser({
         preview.once("exit", resolve);
         preview.kill("SIGTERM");
       });
+    }
+    // 无论哪一步失败，本轮新增的服务都不能耗尽后续验收的配额。
+    for (const provider of (await agent("GET", "/settings")).providers) {
+      if (!baseline.has(provider.id)) {
+        await removeFixtureProvider(agent, provider.id);
+      }
     }
   }
 }

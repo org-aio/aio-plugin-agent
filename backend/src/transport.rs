@@ -60,6 +60,7 @@ async fn authenticate(
 
 pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
     let application = Router::new()
+        .route("/ui/render", post(render_ui))
         .route("/skills", post(crate::generated::skills::controller::page))
         .route(
             "/worker/skills.sync",
@@ -117,4 +118,13 @@ pub fn router(service: Arc<dyn AgentService>, ingress: Ingress) -> Router {
         .route("/health", get(|| async { "ok" }))
         .route("/aio/describe", get(crate::hosting::describe))
         .merge(application)
+}
+
+async fn render_ui(
+    axum::Json(request): axum::Json<az_agent_frontend::RenderRequest>,
+) -> Result<axum::Json<serde_json::Value>, StatusCode> {
+    let html = az_agent_frontend::render(request)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    Ok(axum::Json(serde_json::json!({"html": html})))
 }

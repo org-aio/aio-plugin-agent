@@ -1,9 +1,15 @@
 # 智能体界面
 
-Dioxus Web 前端，依赖共享 az-ui-components 的布局、主题、表单、Markdown 与 Dialog；业务不定义 CSS。通过 AIO Web SDK 获取已认证的数据，不接触服务密钥。
+固定 Topcoat 0.6.2 的 Rust HTML 片段与浏览器原生 ES modules。`src/main.rs` 导出对话、设置与 Skill 管理三个入口；`src/lib.rs` 供后端认证后的 `/ui/render` 和本地夹具共用。所有动态文本经 Topcoat 转义，Markdown 另行净化。
 
-主入口 index.html 为会话工作空间；同一构建的 settings.html 标记为独立设置页，由宿主插件设置 Dialog 挂载。对话、模型选择、执行设备与本地项目选择、记忆来源/权限、图谱各自独立，传输模型来自 shared/rust。本地项目使用设备返回的逻辑 ID，界面不接触本机绝对路径。
+共享外观来自 `frontend/style-source.json` 固定的 dioxus-admin-workbench 提交，由打包脚本校验 Git revision 后复制；不加载 Dioxus/Wasm，也不引入业务 CSS。浏览器通过正式 AIO SDK 使用当前身份，不接触服务密钥。
 
-构建：在仓库根运行 `dx build --package az-agent-frontend --platform web --release`，再运行 `node scripts/package-frontend.mjs`。完整浏览器验证见 scripts/README.md。
+```sh
+cargo run --locked -p az-agent-frontend -- dist/frontend
+node scripts/package-frontend.mjs
+npm run test:ui
+npm run test:processing
+npm run test:cloud
+```
 
-对话工作区采用共享 Codex 外观；入口、交互及验收边界见 [对话工作区](../docs/conversation-ui.md)。本地视觉验收运行 `npm run preview:ui`，自动验收运行 `npm run test:ui`，均使用明确标识的内存示例数据。
+页面与协议边界见 [对话工作区](../docs/conversation-ui.md) 和 [云电脑](../docs/cloud-codex.md)。
