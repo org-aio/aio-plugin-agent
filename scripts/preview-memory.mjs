@@ -48,11 +48,11 @@ async function shutdown() {
     ),
   );
 }
-async function launch(cwd, env, url) {
-  const child = spawn(process.execPath, ["scripts/preview.mjs"], {
+async function launch(cwd, env, url, entry = "scripts/preview.mjs") {
+  const child = spawn(process.execPath, [entry], {
     cwd,
     env: { ...process.env, ...env },
-    stdio: "inherit",
+    stdio: ["pipe", "inherit", "inherit"],
   });
   children.push(child);
   child.once("exit", () => {
@@ -76,11 +76,12 @@ try {
   await launch(
     memoryRoot,
     {
-      PORT: String(memoryPort),
+      AIO_MEMORY_BRIDGE_PORT: String(memoryPort),
       AIO_MEMORY_DEV_DIRECTORY: resolve(directory, "memory"),
       AIO_MEMORY_BRIDGE_TOKEN: token,
     },
-    memoryUrl,
+    `${memoryUrl}/health`,
+    resolve(root, "scripts/memory-fixture.mjs"),
   );
   const agentPort = await available(Number(process.env.PORT || 4192));
   const backendPort = await available(
@@ -99,7 +100,7 @@ try {
     },
     agentUrl,
   );
-  console.log(`Agent: ${agentUrl}\nMemory: ${memoryUrl}`);
+  console.log(`Agent: ${agentUrl}\nMemory bridge: ${memoryUrl}/broker`);
   for (const signal of ["SIGINT", "SIGTERM"])
     process.on(signal, () => void shutdown());
 } catch (error) {

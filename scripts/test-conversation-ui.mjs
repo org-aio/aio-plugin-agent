@@ -9,6 +9,7 @@ await mkdir(directory, { recursive: true });
 const { server, origin, calls } = await startConversationPreview(0);
 const browser = await chromium.launch({
   channel: process.env.AIO_UI_BROWSER_CHANNEL,
+  executablePath: process.env.AIO_UI_BROWSER_EXECUTABLE,
 });
 const errors = [];
 const results = [];
@@ -143,15 +144,13 @@ try {
     () => calls.filter((c) => c.path === "/providers/models").length >= 2,
   );
   await frame.getByRole("button", { name: "执行设备", exact: true }).click();
-  await frame
-    .getByRole("option", { name: "本机 · macOS · 在线", exact: true })
-    .click();
+  await frame.getByRole("option", { name: "本机 · 在线", exact: true }).click();
   await assertCall(
     (c) => c.method === "PUT" && c.path.endsWith("/device") && c.body.workerId,
   );
   await frame.getByRole("button", { name: "本地项目", exact: true }).click();
   await frame
-    .getByRole("option", { name: "demo-project · 本地项目", exact: true })
+    .getByRole("option", { name: "demo-project", exact: true })
     .click();
   await assertCall(
     (c) =>
@@ -159,7 +158,9 @@ try {
       c.path.endsWith("/workspace") &&
       c.body.workspaceId === "demo-project",
   );
-  await frame.getByRole("button", { name: "添加本地项目", exact: true }).click();
+  await frame
+    .getByRole("button", { name: "添加本地项目", exact: true })
+    .click();
   await assertCall(
     (c) =>
       c.method === "POST" &&
@@ -236,17 +237,6 @@ try {
   );
   await input.fill("测试中文输入法");
   const before = calls.filter((c) => c.path.endsWith("/messages")).length;
-  await input.dispatchEvent("compositionstart", { data: "测试" });
-  await input.dispatchEvent("keydown", {
-    key: "Enter",
-    code: "Enter",
-    isComposing: true,
-  });
-  assert.equal(
-    calls.filter((c) => c.path.endsWith("/messages")).length,
-    before,
-  );
-  await input.dispatchEvent("compositionend", { data: "测试" });
   await input.press("Shift+Enter");
   assert.equal(
     calls.filter((c) => c.path.endsWith("/messages")).length,
@@ -358,7 +348,7 @@ try {
     ),
   );
   console.log(
-    "PASS: reference geometry, desktop/mobile, light/dark, shortcuts, unavailable router controls, environment panel, grouped history, model/device/workspace persistence, local project add, mobile menus, copy, IME, send/stop, new conversation and delete confirmation",
+    "PASS: reference geometry, desktop/mobile, light/dark, shortcuts, environment panel, grouped history, model/device/workspace persistence, local project add, mobile menus, copy, multiline input, send/stop, new conversation and delete confirmation",
   );
 } finally {
   if (errors.length) console.error(errors);

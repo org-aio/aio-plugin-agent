@@ -312,6 +312,7 @@ pub(super) async fn run(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn tools(
     core: &Arc<Core>,
     scope: &Scope,

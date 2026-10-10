@@ -10,18 +10,6 @@ use crate::{
 
 pub const MEMORY_SOURCE: &str = "https://github.com/org-aio/aio-plugin-agent-memory.git";
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn memory_source_matches_delivery_metadata() -> anyhow::Result<()> {
-        let manifest = include_str!("../../../aio-plugin.toml");
-        assert!(manifest.contains(&format!("services = [\"{}\"]", super::MEMORY_SOURCE)));
-        let family: serde_json::Value = serde_json::from_str(include_str!("../../../family.json"))?;
-        assert_eq!(family["children"][0]["git"], super::MEMORY_SOURCE);
-        Ok(())
-    }
-}
-
 pub fn load() -> Result<Option<(RuntimeConfig, Ingress)>> {
     let Some(path) = std::env::var_os("AIO_PLUGIN_CONFIG") else {
         return Ok(None);
@@ -84,4 +72,16 @@ pub async fn describe() -> axum::Json<serde_json::Value> {
     axum::Json(
         serde_json::json!({"label":"智能体","pages":[{"id":"chat","label":"对话","entry":"index.html","scene":["workspace","工作空间"],"menu_path":["智能体"],"permission":null,"surface":"workspace"},{"id":"skills","label":"Skill 管理","entry":"skills.html","scene":["workspace","工作空间"],"menu_path":["智能体"],"permission":null,"surface":"workspace"},{"id":"settings","label":"智能体设置","entry":"settings.html","scene":null,"menu_path":[],"permission":null,"surface":"fullscreen"}]}),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn memory_source_matches_delivery_metadata() -> anyhow::Result<()> {
+        let manifest = include_str!("../../../aio-plugin.toml");
+        assert!(manifest.contains(&format!("services = [\"{}\"]", super::MEMORY_SOURCE)));
+        let family: serde_json::Value = serde_json::from_str(include_str!("../../../family.json"))?;
+        assert_eq!(family["children"][0]["git"], super::MEMORY_SOURCE);
+        Ok(())
+    }
 }

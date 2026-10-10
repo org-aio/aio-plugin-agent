@@ -2,7 +2,8 @@
   "source": "aio-platform/sdk/web",
   "protocol": "aio:plugin@2",
   "files": {
-    "guest.js": "cc37ab087cdbd6d60919a2c98d5ed6af485080cbabf833ac07d5155d66e44f9c",
-    "host.mjs": "6f2da60c291d2fb56df474138c1a3cde17d4f7e426f2b89796c4a40f8fbd2a68"
+    "guest.js": "56f83378f47ac3090b7576ada557bea39146ed1e85aa74ecd3713abe94fcc074",
+    "host.mjs": "b9af35159e14ecbb0197d5cb7a302f9515582923fd31d120d62a6a828b588727",
+    "navigation.js": "c4d49db67a068d25846974caa1a2530b7d1ff536dbc5d54ad06ff0825a4fd86d"
   }
 }

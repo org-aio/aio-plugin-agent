@@ -1,6 +1,7 @@
 # 功能与验证边界
 
-- [对话工作区](conversation-ui.md)：Dioxus 页面结构、共享 Codex 外观、菜单与消息交互，以及真实 Wasm 的视觉验收。
+- [云电脑 Codex](cloud-codex.md)：无图形服务器上的原生 Codex、项目授权、多窗口边界，以及完整 Codex＋Buddy 的能力对照。
+- [对话工作区](conversation-ui.md)：Topcoat 页面结构、共享 Codex 外观、菜单与消息交互，以及真实 Topcoat 页面 的视觉验收。
 - [设备编排](device-orchestration.md)：设备选择、结构化提问与执行恢复。
 - [桌面操作](desktop-control.md)：桌面 Worker 与执行回执。
 - [蜂群执行](swarm-execution.md)：独立子任务、状态与取消边界。

@@ -1,105 +1,31 @@
-mod conversation;
-mod graph;
-mod memory;
-mod models;
-mod settings;
-mod skills;
-mod state;
-mod swarm;
-mod transport;
-mod user_input;
-use dioxus::prelude::*;
-use state::AgentState;
-fn main() {
-    console_error_panic_hook::set_once();
-    LaunchBuilder::web()
-        .with_cfg(
-            dioxus::web::Config::new()
-                .history(std::rc::Rc::new(dioxus::history::MemoryHistory::default())),
-        )
-        .launch(App);
-}
-#[component]
-fn App() -> Element {
-    let mut page = use_signal(|| None::<String>);
-    use_future(move || async move {
-        let name = document::eval(
-            "return document.querySelector('meta[name=aio-page]')?.content || 'chat';",
-        )
-        .await
-        .unwrap_or_default()
-        .as_str()
-        .unwrap_or("chat")
-        .to_owned();
-        page.set(Some(name));
-    });
-    rsx! {
-        az_ui_components::UiStylesheets { relative_paths: true }
-        match page().as_deref() {
-            Some("skills") => rsx! { skills::SkillPage {} },
-            Some(_) => rsx! { AgentApp {} },
-            None => rsx! { p { "正在加载" } },
-        }
+use az_agent_frontend::{RenderRequest, render};
+use serde_json::json;
+use std::io::{Read, Write};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let output = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "dist/frontend".into());
+    if output == "--render" {
+        let mut input = String::new();
+        std::io::stdin().read_to_string(&mut input)?;
+        let html = render(serde_json::from_str(&input)?).await?;
+        std::io::stdout().write_all(html.as_bytes())?;
+        return Ok(());
     }
-}
-#[component]
-fn AgentApp() -> Element {
-    let mut state = use_signal(AgentState::default);
-    let mut settings_page = use_signal(|| None::<bool>);
-    use_context_provider(|| state);
-    use_future(move || async move {
-        let settings = document::eval(
-            "return document.querySelector('meta[name=aio-page]')?.content === 'settings';",
-        )
-        .await
-        .unwrap_or_default()
-        .as_bool()
-        .unwrap_or(false);
-        settings_page.set(Some(settings));
-        state.write().settings_page = settings;
-        if let Err(error) = state::load(state, !settings).await {
-            state.write().error = Some(error);
-        }
-    });
-    use_future(move || async move {
-        loop {
-            gloo_timers::future::TimeoutFuture::new(650).await;
-            let current = state.peek().thread.clone();
-            if state.peek().busy {
-                continue;
-            }
-            if let Some(thread) = current {
-                if !state.peek().processing() && !state.peek().memory_processing() {
-                    continue;
-                }
-                let version = state.peek().generation;
-                let result = transport::get_thread(thread.conversation.id).await;
-                if state.peek().generation != version {
-                    continue;
-                }
-                match result {
-                    Ok(thread) => {
-                        state.write().thread = Some(thread);
-                    }
-                    Err(error) => {
-                        state.write().error = Some(error);
-                    }
-                }
-            }
-        }
-    });
-    rsx! {
-        az_ui_components::UiStylesheets { relative_paths: true }
-        if state.read().settings.is_none() {
-            az_ui_components::admin::RequestState { error: state
-                        .read().error.clone().unwrap_or_default() }
-        } else if settings_page() == Some(true) {
-            settings::SettingsPanel {}
-        } else {
-            conversation::ConversationPage {}
-        }
-        if let Some(dialog) = state.read().dialog.clone() {
-            settings::Dialogs { dialog }
-        }
+    std::fs::create_dir_all(&output)?;
+    for (file, page) in [
+        ("index.html", "chat"),
+        ("settings.html", "settings"),
+        ("skills.html", "skills"),
+    ] {
+        let html = render(RenderRequest {
+            section: "shell".into(),
+            data: json!(page),
+        })
+        .await?;
+        std::fs::write(format!("{output}/{file}"), html)?;
     }
+    Ok(())
 }

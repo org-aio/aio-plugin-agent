@@ -1,4 +1,4 @@
-// 使用真实 Wasm 和宿主桥验证输入状态；内存夹具不代表后端任务或真实模型验收。
+// 使用真实 Topcoat 页面和宿主桥验证输入状态；内存夹具不代表后端任务或真实模型验收。
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -175,6 +175,7 @@ async function geometry(frame, label) {
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({
   channel: process.env.AIO_UI_BROWSER_CHANNEL,
+  executablePath: process.env.AIO_UI_BROWSER_EXECUTABLE,
 });
 const results = [];
 const errors = [];
@@ -211,11 +212,6 @@ async function verifyScenario(viewport, scenario) {
       .waitFor();
     const input = frame.getByRole("textbox", { name: "发送消息", exact: true });
     await input.waitFor();
-    if (scenario.status === "awaiting_input") {
-      await frame
-        .getByRole("button", { name: "稍后回答", exact: true })
-        .click();
-    }
     assert(await input.isEditable(), `${label}: 输入框必须可编辑`);
     const draft = `保留下一条草稿 ${scenario.name}`;
     await input.fill(draft);

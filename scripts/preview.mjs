@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { resolve, extname, sep } from "node:path";
 import { parse, serialize } from "parse5";
+import { previewNavigation } from "./preview-navigation.mjs";
 
 const root = process.cwd(),
   port = Number(process.env.PORT || 4192),
@@ -21,7 +22,7 @@ const sdk = resolve(root, "sdk/web");
 const child =
   process.env.AIO_AGENT_EXTERNAL_BACKEND === "1"
     ? null
-    : spawn(resolve(root, "target/debug/az-agent-server"), [], {
+    : spawn(process.env.AIO_AGENT_SERVER || resolve(root, "target/debug/az-agent-server"), [], {
         stdio: ["ignore", "inherit", "inherit"],
         env: {
           ...process.env,
@@ -49,7 +50,7 @@ for (let attempt = 0; ; attempt++) {
   } catch {}
   await new Promise((resolve) => setTimeout(resolve, 100));
 }
-const shell = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>智能体 · AIO</title><body style="margin:0;overflow:hidden"><iframe id="plugin" title="智能体" src="/assets/index.html" sandbox="allow-scripts allow-forms" style="display:block;width:100vw;height:100vh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';const dispose=mountBridge(document.getElementById('plugin'),async request=>{const response=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json','x-aio-ticket':'${ticket}'},body:JSON.stringify({...request,body:Array.from(request.body)})});if(!response.ok)throw new Error(await response.text());return response.json()},{clipboard:true});addEventListener('pagehide',dispose,{once:true});</script></body></html>`;
+const shell = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>智能体 · AIO</title><body style="margin:0;overflow:hidden"><iframe id="plugin" title="智能体" src="/assets/index.html" sandbox="allow-scripts allow-forms" style="display:block;width:100vw;height:100vh;border:0"></iframe><script type="module">import {mountBridge} from '/bridge/host.mjs';${previewNavigation()}const dispose=mountBridge(document.getElementById('plugin'),async request=>{const response=await fetch('/invoke',{method:'POST',headers:{'content-type':'application/json','x-aio-ticket':'${ticket}'},body:JSON.stringify({...request,body:Array.from(request.body)})});if(!response.ok)throw new Error(await response.text());return response.json()},{clipboard:true});addEventListener('pagehide',dispose,{once:true});</script></body></html>`;
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -89,7 +90,7 @@ const server = createServer(async (req, res) => {
       if (
         !["GET", "POST", "PUT", "DELETE"].includes(input.method) ||
         typeof input.path !== "string" ||
-        !/^\/(settings|providers|conversations|memory|tools|devices)(\/[a-zA-Z0-9/-]+)?$/.test(
+        !/^\/(settings|providers|conversations|memory|tools|devices|skills|ui)(\/[a-zA-Z0-9/-]+)?$/.test(
           input.path,
         ) ||
         !Array.isArray(input.body) ||
@@ -157,7 +158,7 @@ const server = createServer(async (req, res) => {
       res.writeHead(204).end();
       return;
     }
-    if (["/bridge/guest.js", "/bridge/host.mjs"].includes(url.pathname)) {
+    if (["/bridge/guest.js", "/bridge/host.mjs", "/bridge/navigation.js"].includes(url.pathname)) {
       res
         .writeHead(200, {
           "content-type": "text/javascript",
@@ -194,6 +195,14 @@ const server = createServer(async (req, res) => {
         tagName: "script",
         namespaceURI: "http://www.w3.org/1999/xhtml",
         attrs: [{ name: "src", value: "/bridge/guest.js" }],
+        childNodes: [],
+        parentNode: head,
+      });
+      head.childNodes.unshift({
+        nodeName: "script",
+        tagName: "script",
+        namespaceURI: "http://www.w3.org/1999/xhtml",
+        attrs: [{ name: "src", value: "/bridge/navigation.js" }, { name: "data-token", value: "preview" }],
         childNodes: [],
         parentNode: head,
       });

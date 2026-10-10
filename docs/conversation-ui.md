@@ -1,38 +1,34 @@
 # 对话工作区
 
-智能体使用 Dioxus Web 实现聊天工作区。`frontend/src/conversation/mod.rs` 是入口；`sidebar.rs` 负责会话导航，`message.rs` 渲染 Markdown 和记忆引用，`composer.rs` 组织消息输入、模型与设备选择。状态、请求与轮询分别保留在 `state.rs`、`transport.rs`、`main.rs`。
+前端采用 Topcoat 0.6.2。`frontend/src/views/shell.rs` 生成静态壳，`frontend/src/lib.rs` 渲染认证后的 HTML 片段；`frontend/web/app.js` 管理状态、URL 和轮询，`interactions.js` 接收用户操作，`dialogs.js` 处理设置、技能和记忆。后端原有持久化 API 继续使用。
 
-## 外观来源与所有权
+## 外观与范围
 
-外壳以桌面安装包 26.915.31945 / build 9922 的静态资源为起点，并按用户提供的魔改界面截图校准。样式由 `dioxus-admin-workbench/crates/ui/components/src/conversation/codex.css` 和 `codex-panels.css` 持有，通过固定 Git revision 的 `az-ui-components` 提供。插件只组合 RSX 与共享样式类，没有复制第三方 React 运行时或打包应用资源。
+沿用原 Agent 的对话、历史分组、模型快捷栏、设备/项目选择、环境面板、设置、Skill 管理和记忆图谱。共享样式来源由 `frontend/style-source.json` 固定提交，打包时校验；业务不复制桌面 React 运行时，也不增加私有 CSS。
 
-参考图为 4018×2368，按 2 倍像素密度在 2009×1184 视口校准：侧栏 345px、背景 `#fdfdfd`；顶栏 46px；白色输入框位于 x=815、y=1053，宽 752px、高 122px、圆角 22px、底部留 9px；消息与路由面板内侧宽度 736px。模型选择在输入区右下方，执行设备位于左下方。较小桌面、手机和深色模式分别适配，不把固定参考尺寸拉伸到所有视口。
-
-截图里的扩展布局由 Dioxus 独立实现：模型快捷横条、可折叠双列 Auto Router 面板、按真实记忆空间分组的会话和右侧环境信息。环境信息在宽屏默认显示，窄屏通过顶栏按钮打开，不伪造文件路径、Git 分支或访问权限。
-
-能力边界：快捷条展示目录中的前 8 个可用模型并调用真实模型选择接口，尚未实现持久化收藏，因此标注为“可用模型”。AIO 当前执行器没有 Buddy 自动路由、隐私离线切换或规划/执行分工协议；面板明确显示未接入，相关开关和选择器禁用，消息仍交给所选对话模型。没有显示虚假的 token 额度、权限开关或桌宠。AIO 品牌、业务名称与示例内容保留。主要几何边界和颜色已校准，但并非整张界面的像素完全一致或 Buddy 功能迁移完成。
+此迁移对应现有 AIO Agent 功能与布局。原版 Desktop 资源桥属于另一入口；Topcoat 页面不等于完整的 Codex Desktop 或 Buddy 设置界面。普通对话仍使用现有 Rust 执行器；云电脑使用 [原生 Codex](cloud-codex.md)。未接入的 Buddy 配置保持明确不可用，不显示虚假的 token 配额或权限开关。
 
 ## 交互与状态
 
-- 模型快捷条与下拉框共享一份模型目录；刷新一次同步两处，切换成功后采用服务端返回的会话模型。
-- 桌面侧栏按记忆空间分组，可折叠；未关联或空间不可见的会话保留在“对话”组，搜索覆盖全部组。侧栏可收起；窄屏变为带遮罩的抽屉，选中会话、遮罩与 Escape 均可关闭。
-- 模型与执行设备沿用共享 Select，列表向上展开；选择成功后以后端返回的 Conversation 为准。读取 Signal 后先释放借用，再更新状态，避免设备选择时发生运行时冲突。
-- Enter 发送、Shift+Enter 换行；输入法合成过程中不会发送。生成或等待结构化回答时禁用普通输入，停止操作调用原取消接口。
-- 助手回复可通过正式宿主桥复制，成功后显示勾选；拒绝授权或复制失败显示错误。Markdown 引用、来源资料和关联图谱入口继续工作。
-- 消息区独立滚动；用户离开底部时不抢滚动，切换会话后重置为跟随新会话。侧栏列表独立滚动。
-- 新建、设置与删除使用共享 Dialog，删除必须经确认；更多菜单只包含已实现的功能。
+- 模型快捷条与选择器共用目录。默认值分别表示跟随空间、跟随服务和显式选择模型。普通对话排队、生成或等待回答时不改变模型；云电脑读取原生模型目录与当前会话模型。
+- 历史按记忆空间分组并支持搜索、折叠；手机使用抽屉。每个窗口独立保存设备、项目和会话路由，刷新及浏览器前进后退可恢复。
+- Enter 发送、Shift+Enter 换行，输入法合成期间不发送。草稿在等待回复和记忆整理时保留；发送请求尚未确认时禁止重复发送或新建。
+- 消息区独立滚动；用户离开底部后不抢滚动。按消息缓存 Topcoat 渲染结果，流式更新只重新渲染变化消息。展开的执行详情和任务结果跨刷新保留。服务端保留 3 MiB 单次请求限制，超大单条消息的渲染错误会明确显示。
+- Markdown 转义原始 HTML、限制 URL；只有后端返回的记忆引用能打开条目。来源、关联图谱、复制回复继续通过正式桥执行。
+- 新建、设置、结构化回答和删除使用共享 Dialog。删除当前会话同时清除路由中的旧会话 ID；Codex 会话采用原生归档语义。
+- 任务列表区分排队、执行、取消、失败和待核对结果，显示错误、JSON 回执与安全位图截图。成功收到回执不等同于真实任务目标已完成。
 
-## 验证与本地查看
-
-在仓库根执行：
+## 构建和验证
 
 ```sh
-dx build --package az-agent-frontend --platform web --release --locked
+cargo run --locked -p az-agent-frontend -- dist/frontend
 node scripts/package-frontend.mjs
+npm run test:cloud
 npm run test:ui
+npm run test:processing
 npm run preview:ui
 ```
 
-没有下载 Playwright Chromium 时，可设置 `AIO_UI_BROWSER_CHANNEL=chrome` 使用本机 Chrome。测试生成 2009×1184 参考视口、1440×900 桌面、390×844 与 390×568 手机的截图、浅深主题、菜单、弹窗与几何测量，写入 `test-results/conversation-ui`；同时检查会话操作的宿主桥请求、路由控件禁用、环境栏开关、分组折叠、手机菜单边界和控制台错误。参考截图仅用于本地对照，不提交用户的截图或私人会话内容。
+可用 `AIO_UI_BROWSER_CHANNEL=chrome` 或 `AIO_UI_BROWSER_EXECUTABLE` 选择已安装浏览器。UI 夹具覆盖参考尺寸、1440×900 桌面、390px 手机、浅深主题、菜单、模型/设备/项目持久化、输入法、发送/停止、新建和删除。截图与测量写入忽略提交的 `test-results`。
 
-`preview:ui` 仅使用内存夹具与正式 SDK 桥，不读取账户配置、不调用真实模型、不持久化真实数据。它验证真实 Wasm 界面及业务接线，包含设备绑定的本地项目选择与“添加本地项目”请求；不能替代 PostgreSQL、设备 Worker、系统目录选择器、Memory 或真实模型的完整链路验证。真实服务预览继续使用 `npm run preview`。
+`preview:ui` 使用正式 SDK 桥与内存夹具，不调用真实模型或访问账户数据。服务测试使用独立 PostgreSQL、Memory 和模拟模型。真实设备连接及任务执行另行验收，不能由夹具测试代替。

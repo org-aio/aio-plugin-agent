@@ -9,7 +9,7 @@ const directory=await mkdtemp(join(tmpdir(),'aio-skills-browser-'));
 execFileSync(process.execPath,['scripts/setup-dev.mjs'],{env:{...process.env,AIO_AGENT_DEV_DIRECTORY:directory},stdio:'inherit'});
 const config=JSON.parse(await readFile(join(directory,'runtime.json'),'utf8'));
 const port=24194;
-const backend=spawn('target/debug/az-agent-server',[],{env:{...process.env,AIO_PLUGIN_PORT:String(port),AIO_AGENT_DATABASE_URL:config.databaseUrl,AIO_AGENT_MASTER_KEY:config.masterKey,AIO_AGENT_INGRESS_TOKEN:config.ingressToken,AIO_AGENT_ENDPOINTS:''},stdio:['ignore','ignore','pipe']});
+const backend=spawn(process.env.AIO_AGENT_SERVER || 'target/debug/az-agent-server',[],{env:{...process.env,AIO_PLUGIN_PORT:String(port),AIO_AGENT_DATABASE_URL:config.databaseUrl,AIO_AGENT_MASTER_KEY:config.masterKey,AIO_AGENT_INGRESS_TOKEN:config.ingressToken,AIO_AGENT_ENDPOINTS:''},stdio:['ignore','ignore','pipe']});
 const root=resolve('dist/frontend');
 const server=createServer(async(req,res)=>{
  try {
@@ -29,7 +29,7 @@ let browser;
 try {
  for(let i=0;;i++){try{if((await fetch(`http://127.0.0.1:${port}/health`)).ok)break;}catch{}if(i>100)throw Error('backend startup timeout');await new Promise(r=>setTimeout(r,100));}
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ browser=await chromium.launch({headless:true,executablePath:process.env.AIO_UI_BROWSER_EXECUTABLE});const page=await browser.newPage({viewport:{width:1440,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/skills.html`);
  await page.getByRole('heading',{name:'Skill 管理',exact:true}).waitFor();
  await page.getByRole('button',{name:'新建 Skill',exact:true}).click();
@@ -50,7 +50,7 @@ try {
  await page.getByRole('button',{name:'管理',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('[aria-label="Skill 正文"]')?.value==='Updated in the browser');
  await page.getByRole('button',{name:'删除当前文件',exact:true}).click();
- await page.getByRole('button',{name:'确认删除',exact:true}).click();
+ await page.getByRole('button',{name:'确认',exact:true}).click();
  await page.getByRole('cell',{name:'browser-acceptance',exact:true}).waitFor({state:'hidden'});
  assert.deepEqual(errors,[]);console.log('PASS desktop/mobile: create, edit, delete confirmation, no overflow, no runtime errors; screenshots /tmp/aio-skills-{desktop,mobile}.png');
 }finally{
