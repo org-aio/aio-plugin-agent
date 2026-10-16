@@ -20,8 +20,21 @@ async fn main() -> Result<()> {
             )
         }
     };
+    let model_binding = std::env::var_os("AIO_AGENT_ENHANCEMENT_BINDING")
+        .map(|path| {
+            az_agent_server::generated::enhancement::configuration::Binding::load(
+                std::path::Path::new(&path),
+                &ingress,
+            )
+        })
+        .transpose()?;
     let service = az_agent_server::service(config).await?;
-    let app = router(service.clone(), ingress);
+    let mut app = router(service.clone(), ingress);
+    if let Some(binding) = model_binding {
+        let model =
+            az_agent_server::generated::enhancement::controller::router(service.clone(), binding)?;
+        app = app.merge(model);
+    }
     if let Some(path) = std::env::var_os("AIO_PLUGIN_SOCKET") {
         use std::os::unix::fs::PermissionsExt;
         if tokio::fs::try_exists(&path).await? {

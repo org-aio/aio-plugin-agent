@@ -9,7 +9,7 @@ const TOKEN_RESOURCE: &str = "agent_tokens";
 ///
 /// 只有经宿主 broker 运行的实例才有 gateway；本机开发实例直接跳过，
 /// 计费失败不改变生成结果，但会在日志中留下记录。
-pub(super) async fn record_tokens(
+pub(crate) async fn record_tokens(
     core: &Core,
     scope: &Scope,
     message: uuid::Uuid,

@@ -12,7 +12,8 @@ pub struct Scope {
     pub context_id: Option<String>,
 }
 
-pub(super) struct ModelConnection {
+#[derive(PartialEq, Eq)]
+pub(crate) struct ModelConnection {
     pub endpoint: String,
     pub model: String,
     pub secret: Option<String>,

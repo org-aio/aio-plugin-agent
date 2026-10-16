@@ -1,5 +1,7 @@
 # 智能体 / AIO Agent
 
+运行时自举可以通过可选的 [MCP 模型源码工具](backend/src/generated/enhancement/README.md) 使用已授权模型生成 Rhai 或 TypeScript 增强。它复用现有模型执行与凭据管理，候选验证和激活仍由 AIO 运行时完成。
+
 Topcoat 0.6.2 + Rust Agent 执行器 + PostgreSQL。`frontend` 管理会话界面，`engine` 提供无界面、无 AIO 依赖的工具循环，`backend` 负责身份、加密、持久化与受控出站，`shared/rust` 共享传输模型。
 
 Topcoat 0.6.2 + Rust Agent executor + PostgreSQL. `frontend` manages the session UI, `engine` provides a headless tool loop without AIO dependencies, `backend` handles identity, encryption, persistence and controlled outbound access, and `shared/rust` holds the shared transport model.

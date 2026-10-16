@@ -3,7 +3,12 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 #[async_trait]
-pub trait AgentService: super::super::skills::service::SkillService + Send + Sync {
+pub trait AgentService:
+    super::super::skills::service::SkillService
+    + super::super::enhancement::service::EnhancementService
+    + Send
+    + Sync
+{
     async fn save_search(
         &self,
         scope: &Scope,

@@ -12,9 +12,7 @@ pub async fn conversation(
     space: &str,
 ) -> Result<Option<ModelConnection>> {
     if let Some(id) = provider {
-        let row = sqlx::query("SELECT id,endpoint,model,secret,user_id FROM agent_providers WHERE id=$1 AND tenant_id=$2 AND user_id=$3")
-            .bind(id).bind(&scope.tenant).bind(&scope.user).fetch_one(&core.pool).await?;
-        let mut connection = decode(core, scope, row)?;
+        let mut connection = personal(core, scope, id).await?;
         if let Some(model) = model {
             connection.model = model.into();
         }
@@ -35,6 +33,13 @@ pub async fn conversation(
     shared(core, scope, Uuid::parse_str(binding)?, space)
         .await
         .map(Some)
+}
+
+/// 读取当前用户拥有的模型；每次调用重新检查归属、地址授权并解密凭据。
+pub(crate) async fn personal(core: &Core, scope: &Scope, id: Uuid) -> Result<ModelConnection> {
+    let row = sqlx::query("SELECT id,endpoint,model,secret,user_id FROM agent_providers WHERE id=$1 AND tenant_id=$2 AND user_id=$3")
+        .bind(id).bind(&scope.tenant).bind(&scope.user).fetch_one(&core.pool).await?;
+    decode(core, scope, row)
 }
 
 pub async fn shared(core: &Core, scope: &Scope, id: Uuid, space: &str) -> Result<ModelConnection> {
